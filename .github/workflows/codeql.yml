@@ -48,7 +48,21 @@ jobs:
         timeout-minutes: 10
         run: |
           mkdir -p build
-          swiftc keychain.swift -o build/tesla-keychain
+          python3 - <<'PY'
+          import pathlib, subprocess, sys
+          build = subprocess.Popen(["swiftc", "keychain.swift", "-o", "build/tesla-keychain"])
+          try:
+              sys.exit(build.wait(timeout=150))
+          except subprocess.TimeoutExpired:
+              subprocess.run(["ps", "-axo", "pid,ppid,pcpu,etime,comm"], check=True)
+              pids = subprocess.run(["pgrep", "-x", "extractor.real"], capture_output=True, text=True).stdout.split()
+              for pid in pids:
+                  report = pathlib.Path("build") / ("sample-" + pid + ".txt")
+                  subprocess.run(["sample", pid, "3", "-file", str(report)], timeout=30)
+                  if report.exists():
+                      print(report.read_text()[:24000], flush=True)
+              sys.exit(build.wait(timeout=240))
+          PY
       - name: Show Swift extraction diagnostics on failure
         if: failure() && matrix.language == 'swift'
         run: |
