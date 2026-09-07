@@ -9,11 +9,14 @@ on:
     - cron: '43 5 * * 1'
 permissions:
   contents: read
+concurrency:
+  group: codeql-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   analyze:
     name: Analyze (${{ matrix.language }})
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 20
+    timeout-minutes: 40
     permissions:
       contents: read
       security-events: write
@@ -25,21 +28,38 @@ jobs:
             os: ubuntu-latest
             build-mode: none
           - language: swift
-            os: macos-latest
+            os: macos-15-intel
             build-mode: manual
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      - name: Select Swift analysis toolchain
+        if: matrix.language == 'swift'
+        run: |
+          echo 'DEVELOPER_DIR=/Applications/Xcode_16.4.app/Contents/Developer' >> "$GITHUB_ENV"
       - uses: github/codeql-action/init@cdf488f595d80d6e07e03d4674febd5ab45fa938 # v4
         with:
           languages: ${{ matrix.language }}
           build-mode: ${{ matrix.build-mode }}
           queries: security-extended
-      - if: matrix.language == 'swift'
+      - name: Build Keychain helper for analysis
+        if: matrix.language == 'swift'
+        # CodeQL 2.26.4 repeats module traversal during lazy extraction.
+        # Keep full analysis enabled until github/codeql#22408 ships.
+        timeout-minutes: 30
         run: |
           mkdir -p build
           swiftc keychain.swift -o build/tesla-keychain
+      - name: Show Swift extraction diagnostics on failure
+        if: failure() && matrix.language == 'swift'
+        run: |
+          if [ -d "$CODEQL_EXTRACTOR_SWIFT_LOG_DIR" ]; then
+            find "$CODEQL_EXTRACTOR_SWIFT_LOG_DIR" -type f -name '*.log' -exec tail -n 40 {} \;
+          fi
+          if [ -f "$CODEQL_TRACER_LOG" ]; then
+            tail -n 80 "$CODEQL_TRACER_LOG"
+          fi
       - uses: github/codeql-action/analyze@cdf488f595d80d6e07e03d4674febd5ab45fa938 # v4
         with:
           category: /language:${{ matrix.language }}

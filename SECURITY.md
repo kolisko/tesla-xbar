@@ -22,6 +22,8 @@ The public repository contains code, tests and fictional previews. Each user own
 
 CI runs unit tests, a tracked-file privacy check, Gitleaks history scanning, macOS helper builds and a Go dependency vulnerability audit. CodeQL analyzes Python and Swift. Dependabot checks GitHub Actions updates. Workflow actions and the Tesla SDK revision are pinned; the SDK audit covers dependencies downloaded by its build.
 
+Swift scanning uses a fixed Xcode 16.4 toolchain on an Intel macOS runner, while the ordinary build tests the latest Apple Silicon runner. CodeQL 2.26.4 has an [upstream performance issue in lazy declaration extraction](https://github.com/github/codeql/pull/22408). The Swift build is allowed up to 30 minutes and the job up to 40 minutes; analysis remains required and findings are not suppressed. Superseded runs are cancelled automatically.
+
 GitHub secret scanning and push protection provide additional checks for supported secret patterns. These checks complement review; they cannot establish the absence of all vulnerabilities or personal information.
 
 Tests and CI use fake accounts and temporary profiles. Never add real Tesla credentials to GitHub Actions secrets for this project. Do not use `pull_request_target` to execute contributor code with privileged tokens.
