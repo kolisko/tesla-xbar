@@ -16,7 +16,7 @@ jobs:
   analyze:
     name: Analyze (${{ matrix.language }})
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 20
+    timeout-minutes: 40
     permissions:
       contents: read
       security-events: write
@@ -45,24 +45,12 @@ jobs:
           queries: security-extended
       - name: Build Keychain helper for analysis
         if: matrix.language == 'swift'
-        timeout-minutes: 10
+        # CodeQL 2.26.4 repeats module traversal during lazy extraction.
+        # Keep full analysis enabled until github/codeql#22408 ships.
+        timeout-minutes: 30
         run: |
           mkdir -p build
-          python3 - <<'PY'
-          import pathlib, subprocess, sys
-          build = subprocess.Popen(["swiftc", "keychain.swift", "-o", "build/tesla-keychain"])
-          try:
-              sys.exit(build.wait(timeout=150))
-          except subprocess.TimeoutExpired:
-              subprocess.run(["ps", "-axo", "pid,ppid,pcpu,etime,comm"], check=True)
-              pids = subprocess.run(["pgrep", "-x", "extractor.real"], capture_output=True, text=True).stdout.split()
-              for pid in pids:
-                  report = pathlib.Path("build") / ("sample-" + pid + ".txt")
-                  subprocess.run(["sample", pid, "3", "-file", str(report)], timeout=30)
-                  if report.exists():
-                      print(report.read_text()[:24000], flush=True)
-              sys.exit(build.wait(timeout=240))
-          PY
+          swiftc keychain.swift -o build/tesla-keychain
       - name: Show Swift extraction diagnostics on failure
         if: failure() && matrix.language == 'swift'
         run: |
