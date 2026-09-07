@@ -21,6 +21,7 @@ class InstallTests(unittest.TestCase):
         install.ensure_keys(self.target)
         private = self.target / "command-key.pem"
         self.assertEqual(private.stat().st_mode & 0o777, 0o600)
+        self.assertEqual((self.target / "public-key.pem").stat().st_mode & 0o777, 0o600)
         self.assertIn(b"PUBLIC KEY", (self.target / "public-key.pem").read_bytes())
         self.assertEqual(list(self.source.glob("*.pem")), [])
         other = self.root / "other-profile"
@@ -30,6 +31,8 @@ class InstallTests(unittest.TestCase):
 
     def test_update_preserves_private_profile_key_helpers_and_interval(self):
         install.ensure_keys(self.target)
+        # Updating must also tighten permissions on an existing identical file.
+        (self.target / "public-key.pem").chmod(0o644)
         for name in ("config.json", "cache.json", "command-result.json", "command-sessions.json"):
             (self.target / name).write_text('{"example": "preserve this value"}')
         before = {p.name: p.read_bytes() for p in self.target.iterdir() if p.is_file()}
@@ -42,6 +45,7 @@ class InstallTests(unittest.TestCase):
             self.assertEqual((self.target / name).read_bytes(), content, name)
         self.assertEqual((self.target / "tesla_xbar.py").read_bytes(), (self.source / "tesla_xbar.py").read_bytes())
         self.assertEqual(self.target.stat().st_mode & 0o777, 0o700)
+        self.assertEqual((self.target / "public-key.pem").stat().st_mode & 0o777, 0o600)
 
     def test_missing_existing_key_is_not_silently_regenerated(self):
         (self.target / "config.json").write_text("{}")

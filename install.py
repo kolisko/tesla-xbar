@@ -44,7 +44,8 @@ def ensure_keys(target):
         os.chmod(key, 0o600)
     result = subprocess.run(["openssl", "pkey", "-in", str(key), "-pubout"],
                             check=True, capture_output=True)
-    atomic_install(result.stdout, target / "public-key.pem", 0o644)
+    # Only the hosted copy needs to be public; keep the local profile owner-only.
+    atomic_install(result.stdout, target / "public-key.pem", 0o600)
 
 
 def build_helpers(source):
