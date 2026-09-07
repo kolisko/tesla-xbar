@@ -28,7 +28,7 @@ jobs:
             os: ubuntu-latest
             build-mode: none
           - language: swift
-            os: macos-15
+            os: macos-15-intel
             build-mode: manual
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -45,7 +45,7 @@ jobs:
           queries: security-extended
       - name: Build Keychain helper for analysis
         if: matrix.language == 'swift'
-        timeout-minutes: 5
+        timeout-minutes: 10
         run: |
           mkdir -p build
           swiftc keychain.swift -o build/tesla-keychain
@@ -54,6 +54,9 @@ jobs:
         run: |
           if [ -d "$CODEQL_EXTRACTOR_SWIFT_LOG_DIR" ]; then
             find "$CODEQL_EXTRACTOR_SWIFT_LOG_DIR" -type f -name '*.log' -exec tail -n 40 {} \;
+          fi
+          if [ -f "$CODEQL_TRACER_LOG" ]; then
+            tail -n 80 "$CODEQL_TRACER_LOG"
           fi
       - uses: github/codeql-action/analyze@cdf488f595d80d6e07e03d4674febd5ab45fa938 # v4
         with:
