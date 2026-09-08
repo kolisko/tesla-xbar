@@ -12,7 +12,7 @@ brew install python go
 brew install --cask xbar
 git clone https://github.com/kolisko/tesla-xbar.git
 cd tesla-xbar
-python3 install.py
+python3 -m scripts.install
 ```
 
 The installer builds the Swift Keychain helper and a pinned version of Tesla's official command helper. For a new profile it generates an independent P-256 key in:
@@ -52,7 +52,7 @@ Complete any required app review and billing setup in the portal. Keep your Clie
 
 ## 4. Configure, register the region and sign in
 
-Open **Settings…** in the xBar plugin. Enter your Client ID, Client Secret, public-key domain and region (`eu`, `na` or `cn`). The secret prompt is hidden. `config.example.json` documents the non-secret fields; the installer does not copy example values over an existing profile.
+Open **Settings…** in the xBar plugin. Enter your Client ID, Client Secret, public-key domain and region (`eu`, `na` or `cn`). The secret prompt is hidden. [`examples/config.example.json`](../examples/config.example.json) documents the non-secret fields; the installer does not copy example values over an existing profile.
 
 Register your domain in the selected Fleet API region from Terminal:
 
@@ -77,13 +77,13 @@ Test physical commands yourself when appropriate. **Start charging**, **Stop cha
 
 ```sh
 git pull --ff-only
-python3 install.py
+python3 -m scripts.install
 ```
 
 For an update that only changes Python code or the wrapper, you can reuse installed helpers:
 
 ```sh
-python3 install.py --runtime-only
+python3 -m scripts.install --runtime-only
 ```
 
 Both paths preserve configuration, keys, tokens, saved readings and the active wrapper's interval. The runtime-only path must not be used when an update requires new helper binaries. Never copy another person's profile or signing key.

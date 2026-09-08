@@ -5,9 +5,9 @@ import time
 import unittest
 from unittest.mock import patch
 
-import tesla_xbar as app
-from test_commands import CommandClient
-from test_tesla_xbar import FakeClient, WakeClient
+from src import tesla_xbar as app
+from tests.test_commands import CommandClient
+from tests.test_tesla_xbar import FakeClient, WakeClient
 
 
 class ReliabilityTests(unittest.TestCase):
