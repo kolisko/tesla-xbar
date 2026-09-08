@@ -50,7 +50,7 @@ jobs:
         timeout-minutes: 30
         run: |
           mkdir -p build
-          swiftc keychain.swift -o build/tesla-keychain
+          swiftc src/keychain.swift -o build/tesla-keychain
       - name: Show Swift extraction diagnostics on failure
         if: failure() && matrix.language == 'swift'
         run: |

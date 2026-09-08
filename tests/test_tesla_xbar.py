@@ -6,7 +6,7 @@ import time
 import unittest
 from unittest.mock import patch
 
-import tesla_xbar as app
+from src import tesla_xbar as app
 
 
 class Vault:

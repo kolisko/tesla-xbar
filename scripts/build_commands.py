@@ -7,7 +7,7 @@ SDK_REVISION = "f97fa1e4bf617a364c72b85cb5d859528abeda67"
 
 
 def build_commands():
-    build = Path(__file__).resolve().parent / "build"
+    build = Path(__file__).resolve().parents[1] / "build"
     checkout = build / "vehicle-command"
     build.mkdir(exist_ok=True)
     if not (checkout / ".git").is_dir():

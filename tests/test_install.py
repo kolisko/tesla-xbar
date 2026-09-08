@@ -1,19 +1,23 @@
+import os
 from pathlib import Path
+import subprocess
+import sys
 import tempfile
 import unittest
 
-import install
+from scripts import install
 
 
 class InstallTests(unittest.TestCase):
     def setUp(self):
-        self.temp = tempfile.TemporaryDirectory()
+        self.temp = tempfile.TemporaryDirectory(prefix="tesla install ")
         self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name)
-        self.source, self.target, self.plugins = (self.root / name for name in ("source", "profile", "plugins"))
+        self.source, self.target, self.plugins = (self.root / name for name in ("source", "profile's data", "plugins"))
         for path in (self.source, self.target, self.plugins):
             path.mkdir()
-        (self.source / "tesla_xbar.py").write_text("# generic code\n")
+        (self.source / "src").mkdir()
+        (self.source / "src" / "tesla_xbar.py").write_text("# generic code\n")
         for name in ("tesla-control", "tesla-keychain"):
             (self.target / name).write_bytes(b"existing helper")
 
@@ -43,7 +47,7 @@ class InstallTests(unittest.TestCase):
         self.assertEqual([p.name for p in self.plugins.iterdir()], [wrapper.name])
         for name, content in before.items():
             self.assertEqual((self.target / name).read_bytes(), content, name)
-        self.assertEqual((self.target / "tesla_xbar.py").read_bytes(), (self.source / "tesla_xbar.py").read_bytes())
+        self.assertEqual((self.target / "tesla_xbar.py").read_bytes(), (self.source / "src" / "tesla_xbar.py").read_bytes())
         self.assertEqual(self.target.stat().st_mode & 0o777, 0o700)
         self.assertEqual((self.target / "public-key.pem").stat().st_mode & 0o777, 0o600)
 
@@ -52,6 +56,24 @@ class InstallTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "Restore"):
             install.ensure_keys(self.target)
         self.assertFalse((self.target / "command-key.pem").exists())
+
+    def test_reorganized_source_installs_runnable_wrapper(self):
+        source = Path(__file__).resolve().parents[1]
+        wrapper = install.install(source, self.target, self.plugins,
+                                  runtime_only=True, python=sys.executable)
+        result = subprocess.run([str(wrapper)], cwd=self.source,
+                                env=os.environ | {"TESLA_XBAR_HOME": str(self.target)},
+                                capture_output=True, text=True, check=True, timeout=10)
+        self.assertIn("Complete setup in the Tesla Developer portal and Settings.", result.stdout)
+        self.assertIn("Settings… | shell=", result.stdout)
+        self.assertEqual((self.target / "tesla_xbar.py").read_bytes(),
+                         (source / "src" / "tesla_xbar.py").read_bytes())
+
+    def test_installer_module_help(self):
+        result = subprocess.run([sys.executable, "-B", "-m", "scripts.install", "--help"],
+                                cwd=Path(__file__).resolve().parents[1],
+                                capture_output=True, text=True, check=True, timeout=10)
+        self.assertIn("--runtime-only", result.stdout)
 
     def test_multiple_active_plugins_fail_before_profile_changes(self):
         for interval in ("1m", "5m"):

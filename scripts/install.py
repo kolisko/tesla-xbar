@@ -9,7 +9,7 @@ import subprocess
 import sys
 import tempfile
 
-from build_commands import build_commands
+from .build_commands import build_commands
 
 VERSION = "0.1.0"
 
@@ -53,7 +53,7 @@ def build_helpers(source):
     build.mkdir(exist_ok=True)
     binary = build / "tesla-keychain"
     subprocess.run(["/usr/bin/swiftc", "-module-cache-path", str(build / "module-cache"),
-                    str(source / "keychain.swift"), "-o", str(binary)], check=True)
+                    str(source / "src" / "keychain.swift"), "-o", str(binary)], check=True)
     return {"tesla-keychain": binary, "tesla-control": build_commands()}
 
 
@@ -76,7 +76,7 @@ def install(source, target, plugins, *, runtime_only=False, python=None):
         ensure_keys(target)
         for name, binary in helpers.items():
             atomic_install(binary.read_bytes(), target / name, 0o700)
-        atomic_install((source / "tesla_xbar.py").read_bytes(), target / "tesla_xbar.py", 0o600)
+        atomic_install((source / "src" / "tesla_xbar.py").read_bytes(), target / "tesla_xbar.py", 0o600)
         launcher = ("#!/bin/bash\nexec " + shlex.quote(python or sys.executable) + " "
                     + shlex.quote(str(target / "tesla_xbar.py")) + ' "$@"\n')
         atomic_install(launcher.encode(), target / "tesla-action.sh", 0o700)
@@ -94,7 +94,7 @@ def main():
     args = parser.parse_args()
     if sys.platform != "darwin":
         parser.error("Tesla xBar requires macOS.")
-    source = Path(__file__).resolve().parent
+    source = Path(__file__).resolve().parents[1]
     target = Path.home() / "Library/Application Support/Tesla xBar"
     plugins = Path.home() / "Library/Application Support/xbar/plugins"
     try:

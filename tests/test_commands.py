@@ -8,8 +8,8 @@ import time
 import unittest
 from unittest.mock import patch
 
-import tesla_xbar as app
-from test_tesla_xbar import Vault, WakeClient
+from src import tesla_xbar as app
+from tests.test_tesla_xbar import Vault, WakeClient
 
 
 class CommandClient(WakeClient):
