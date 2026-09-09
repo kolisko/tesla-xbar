@@ -15,13 +15,6 @@ def bolt(x, y, scale=1):
     return f'<path transform="translate({x},{y}) scale({scale})" d="M18 0 1 23h12L7 40 30 15H17L24 0Z" fill="#ffd24a"/>'
 
 
-def moon(x, y):
-    return f'<path transform="translate({x},{y})" d="M23 2A16 16 0 1 0 28 29 16 16 0 0 1 23 2Z" fill="none" stroke="#c9d7e4" stroke-width="2"/>'
-
-
-def broken_link(x, y):
-    return f'<g transform="translate({x},{y})" fill="none" stroke="#c9d7e4" stroke-width="3" stroke-linecap="round"><path d="m13 20-3 3a7 7 0 0 1-10-10l7-7a7 7 0 0 1 10 0M21 12l3-3a7 7 0 0 1 10 10l-7 7a7 7 0 0 1-10 0"/><path d="m15 4 3-5m10 31 3 4M4 30l-4 3" stroke="#ffd24a"/></g>'
-
 
 def svg(width, height, body):
     return (f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}" role="img">'
@@ -64,14 +57,12 @@ body += '<path d="m562 972 7 7-7 7" fill="none" stroke="#e5e9ed" stroke-width="2
 body = '<rect width="1000" height="380" rx="20" fill="#111c29"/>'
 examples = [('Charging', '360 km', '#32cd66', 'bolt'), ('Connected · paused', '360 km', '#32cd66', ''),
             ('Unplugged · below 350 km', '320 km', '#f5a623', ''), ('Unplugged · below 300 km', '280 km', '#ef4444', ''),
-            ('Asleep · last known range', '360 km', '#32cd66', 'moon'), ('Offline · last known range', '360 km', '#32cd66', 'link')]
+            ('Asleep · last known range', '360 km', '#a0a6ad', ''), ('Offline · last known range', '360 km', '#a0a6ad', '')]
 for i, (label, value, color, icon) in enumerate(examples):
     x, y = 20+(i%3)*326, 20+(i//3)*178
     body += f'<rect x="{x}" y="{y}" width="308" height="158" rx="14" fill="#1b2c3e"/>'
     body += text(x+20, y+40, label, 18, '#b4c6d7')
     body += text(x+20, y+109, value, 34, color)
     if icon=='bolt':body+=bolt(x+164,y+76,0.9)
-    elif icon=='moon':body+=moon(x+165,y+77)
-    elif icon=='link':body+=broken_link(x+174,y+78)
 (OUT / 'states.svg').write_text(svg(1000, 380, body))
 print('Created three SVG previews using fictional data only.')

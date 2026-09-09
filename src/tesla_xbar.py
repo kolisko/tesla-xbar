@@ -32,6 +32,7 @@ SCOPES = "openid offline_access vehicle_device_data vehicle_cmds vehicle_chargin
 REDIRECT = "http://localhost:8765/callback"
 DEFAULTS = {"region": "eu", "redirect_uri": REDIRECT, "display_mode": "range"}
 STALE_AFTER_SECONDS = 30 * 60
+UNVERIFIED_TEXT_COLOR = "#A0A6AD"
 VEHICLE_COMMANDS = {
     "charge-start": ("charging-start", "Start charging", "charge_start"),
     "charge-stop": ("charging-stop", "Stop charging", "charge_stop"),
@@ -551,13 +552,12 @@ def render(cache, config, demo=False):
     level = charge.get("battery_level")
     level = level if number(level) and 0 <= level <= 100 else None
     now = time.time()
-    stale = now - cache.get("updated_at", 0) > STALE_AFTER_SECONDS
+    stale = now - cache.get("updated_at", 0) >= STALE_AFTER_SECONDS
     offline = cache.get("state") != "online"
+    unverified = offline or stale or bool(cache.get("error"))
     charging = charging_is_current(cache, config)
-    suffix = " ⚡" if charging else {"asleep": " ☾", "offline": " ⛓️‍💥"}.get(cache.get("state"), "")
-    if (stale or cache.get("error")) and level is not None:
-        suffix += " ·"
-    color = battery_color(cache)
+    suffix = " ⚡" if charging else ""
+    color = UNVERIFIED_TEXT_COLOR if unverified else battery_color(cache)
     distance = vehicle_range(cache)
     value = (f"{level:g}%" if level is not None else None) if config.get("display_mode") == "percent" else distance
     top = f"{'DEMO ' if demo else ''}{value if value is not None else '—'}{suffix}"
@@ -573,11 +573,11 @@ def render(cache, config, demo=False):
             lines.append(f"Charge limit: {charge['charge_limit_soc']:g} %")
         connected = cable_connected(charge)
         if connected is not None:
-            lines.append(("Last known cable state: " if offline or stale or cache.get("error") else "Cable: ")
+            lines.append(("Last known cable state: " if unverified else "Cable: ")
                          + ("connected" if connected else "disconnected"))
         labels = {"Charging": "Charging", "Complete": "Charge complete", "Stopped": "Charging stopped", "Disconnected": "Disconnected", "NoPower": "No power"}
         state = labels.get(charge.get("charging_state"), "Unknown charging state")
-        lines.append(("Last known state: " if offline or stale or cache.get("error") else "") + state)
+        lines.append(("Last known state: " if unverified else "") + state)
         if charging and number(charge.get("charger_power")):
             lines.append(f"Power: {charge['charger_power']:g} kW")
         if charging:
@@ -593,15 +593,15 @@ def render(cache, config, demo=False):
     if cache.get("state") == "asleep":
         lines.append("Vehicle asleep • last known data | color=gray")
     elif cache.get("state") == "offline":
-        lines.append("⛓️‍💥 Vehicle offline • last known data | color=gray")
+        lines.append("Vehicle offline • last known data | color=gray")
     elif offline and cache.get("state"):
         lines.append("Vehicle connection unverified • last known data | color=gray")
     if cache.get("error"):
         lines.extend(["---", safe_text(cache["error"]) + " | color=#D9534F"])
     if cache.get("wake_in_progress"):
         lines.append("Waking the vehicle and waiting for it to connect… | color=gray")
-    if stale and level is not None:
-        lines.append("The dot marks an old or unverified reading. | color=gray")
+    if unverified and value is not None:
+        lines.append("Gray text marks a last known or unverified reading. | color=gray")
     report = read_json("command-result.json")
     if report and report.get("vin") in (None, cache.get("vin")):
         stamp = dt.datetime.fromtimestamp(report.get("at", 0)).strftime("%H:%M")
