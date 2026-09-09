@@ -32,18 +32,18 @@ class ReliabilityTests(unittest.TestCase):
                 result = app.main()
         return result, output.getvalue(), factory
 
-    def test_connection_icons_survive_missing_range_and_missing_battery(self):
+    def test_unavailable_readings_are_gray_without_icons_even_when_data_is_missing(self):
         baseline = self.seed()
-        for state, symbol in (("asleep", "☾"), ("offline", "⛓️‍💥")):
+        for state in ("asleep", "offline", "unknown", None):
             for charge, gui in ((baseline["charge"], baseline["gui_settings"]),
                                 (baseline["charge"], {}), ({}, {})):
                 cache = baseline | {"state": state, "charge": charge, "gui_settings": gui}
                 top = app.render(cache, self.config).splitlines()[0]
-                self.assertIn(symbol, top)
-                self.assertNotIn("⚡", top)
-                self.assertNotIn("☾" if state == "offline" else "⛓️‍💥", top)
-        self.assertIn("— ☾", app.render({"state": "asleep"}, self.config))
-        self.assertIn("— ⛓️‍💥", app.render({"state": "offline"}, self.config))
+                value = "161 km" if gui else "—"
+                self.assertEqual(top, f"{value} | color=#A0A6AD")
+        for state in ("asleep", "offline"):
+            self.assertEqual(app.render({"state": state}, self.config).splitlines()[0],
+                             "— | color=#A0A6AD")
         self.assertIn("⚡", app.render(baseline, self.config).splitlines()[0])
 
     def test_408_is_unavailable_and_only_successful_list_verifies_vehicle(self):
@@ -67,7 +67,7 @@ class ReliabilityTests(unittest.TestCase):
     def test_offline_and_sleep_preserve_old_range_percent_and_original_timestamp(self):
         baseline = self.seed()
         baseline["updated_at"] = time.time() - 86400
-        for state, icon in (("offline", "⛓️‍💥"), ("asleep", "☾")):
+        for state in ("offline", "asleep"):
             app.save_json("cache.json", baseline)
             client = FakeClient(state=state)
             cache = app.fetch_state(self.config, client=client)
@@ -77,8 +77,12 @@ class ReliabilityTests(unittest.TestCase):
             self.assertEqual(client.calls, ["/api/1/vehicles"])
             for mode, value in (("range", "161 km"), ("percent", "72%")):
                 menu = app.render(cache, self.config | {"display_mode": mode})
-                self.assertTrue(menu.startswith(f"{value} {icon} ·"))
+                self.assertEqual(menu.splitlines()[0], f"{value} | color=#A0A6AD")
                 self.assertIn("Battery reading from", menu)
+                self.assertIn(f"Vehicle {state}", menu)
+                self.assertNotIn("☾", menu)
+                self.assertNotIn("⛓️‍💥", menu)
+                self.assertNotIn("The dot marks", menu)
 
     def test_list_timeout_never_wakes_or_commands_a_cached_vehicle(self):
         self.seed()
@@ -89,6 +93,21 @@ class ReliabilityTests(unittest.TestCase):
         self.assertEqual(client.wakes, [])
         self.assertEqual(client.commands, [])
         capabilities.assert_not_called()
+
+    def test_failed_or_expired_online_readings_mute_colors_until_fresh(self):
+        with patch.object(app.time, "time", return_value=10_000):
+            cache = self.seed()
+            for charging_state, color in (("Charging", "#32CD66"), ("Stopped", "#32CD66"),
+                                           ("Disconnected", "#EF4444")):
+                cache["charge"]["charging_state"] = charging_state
+                for changes in ({"error": "Network unavailable"},
+                                {"updated_at": 10_000 - app.STALE_AFTER_SECONDS}):
+                    with self.subTest(charging_state=charging_state, changes=changes):
+                        self.assertEqual(app.render(cache | changes, self.config).splitlines()[0],
+                                         "161 km | color=#A0A6AD")
+                suffix = " ⚡" if charging_state == "Charging" else ""
+                self.assertEqual(app.render(cache, self.config).splitlines()[0],
+                                 f"161 km{suffix} | color={color}")
 
     def test_429_uses_exact_server_delay_and_retries_at_deadline(self):
         client = FakeClient()

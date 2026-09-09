@@ -73,7 +73,8 @@ class Tests(unittest.TestCase):
         self.assertEqual(result["charge"]["battery_level"], 42)
         self.assertEqual(result["updated_at"], 10)
         self.assertEqual(client.calls, ["/api/1/vehicles"])
-        self.assertIn("☾", app.render(result, self.config | {"display_mode": "percent"}).splitlines()[0])
+        self.assertEqual(app.render(result, self.config | {"display_mode": "percent"}).splitlines()[0],
+                         "42% | color=#A0A6AD")
 
     def test_online_fetches_charge_and_display_preferences_once(self):
         client = FakeClient()
@@ -91,7 +92,8 @@ class Tests(unittest.TestCase):
             result = app.fetch_state(self.config, client=client)
         self.assertEqual(result["charge"]["battery_level"], 80)
         self.assertEqual(result["updated_at"], 100)
-        self.assertIn("·", app.render(result, self.config | {"display_mode": "percent"}).splitlines()[0])
+        self.assertEqual(app.render(result, self.config | {"display_mode": "percent"}).splitlines()[0],
+                         "80% | color=#A0A6AD")
 
     def test_rotation_saved_before_next_use(self):
         vault = Vault({"access_token": "old", "refresh_token": "refresh-old", "expires_at": 0})
@@ -189,7 +191,7 @@ class Tests(unittest.TestCase):
     def test_sleep_keeps_range_and_preferences(self):
         app.fetch_state(self.config, client=FakeClient())
         cache = app.fetch_state(self.config, client=FakeClient("asleep"))
-        self.assertEqual(app.render(cache, self.config).splitlines()[0].split(" |")[0], "161 km ☾")
+        self.assertEqual(app.render(cache, self.config).splitlines()[0], "161 km | color=#A0A6AD")
 
     def test_remote_menu_injection_removed(self):
         value = app.safe_text("---evil\nOpen | shell=/bin/sh\nparam1=bad")

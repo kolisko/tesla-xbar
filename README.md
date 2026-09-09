@@ -23,7 +23,7 @@ Open the menu to see battery percentage, Tesla's range, charge limit, cable conn
 - **Range or percentage:** switch through **Menu bar display**. Range comes directly from Tesla's range fields and uses the vehicle's distance units.
 - **Cable and charging status:** green when connected, including scheduled or paused charging; a lightning symbol marks fresh online charging data.
 - **Low-range colors:** orange below 350 km and red below 300 km when unplugged. Connected cable status takes precedence.
-- **Last known data:** asleep (`☾`) and offline (`⛓️‍💥`) keep the saved range or percentage. A dot marks an old or unverified reading; the original timestamp stays visible in the menu.
+- **Last known data:** asleep, offline and unverified readings keep the saved range or percentage in muted gray, without a status icon or dot. The connection state and original reading timestamp stay visible in the menu. Gray also marks a failed refresh or a reading at least 30 minutes old.
 - **One refresh schedule:** xBar's filename controls polling (`1m`, `5m`, etc.). **Refresh now** uses the same path. No second polling timer or invented monthly quota.
 - **Explicit commands:** wake and refresh, start/stop charging, and open/close the charge port. Normal refresh never sends a wake command.
 - **Private profiles:** tokens and Client Secret in Keychain; configuration, signing key and cached readings in the current user's Application Support directory.
@@ -131,7 +131,7 @@ GitHub checks include **CodeQL for Python and Swift, Gitleaks, a privacy scan, D
 
 ## Behavior and limits
 
-- Offline is not proof of sleep. An HTTP 408 is treated as unavailable; only an explicit `asleep` state gets the moon.
+- Offline is not proof of sleep. An HTTP 408 is treated as unavailable. The menu distinguishes confirmed sleep from offline status; both use muted gray text in the menu bar.
 - An offline/asleep reading can be old. The plugin keeps it and shows its timestamp; it never fabricates a fresh value.
 - Range is never estimated from battery percentage. API miles are converted to kilometers only when required by the vehicle's units.
 - Range/percentage selection is local. Automatic synchronization with the Tesla mobile app's display preference is not implemented.
