@@ -191,7 +191,7 @@ class Tests(unittest.TestCase):
     def test_sleep_keeps_range_and_preferences(self):
         app.fetch_state(self.config, client=FakeClient())
         cache = app.fetch_state(self.config, client=FakeClient("asleep"))
-        self.assertEqual(app.render(cache, self.config).splitlines()[0], "161 km | color=#A0A6AD")
+        self.assertEqual(app.render(cache, self.config).splitlines()[0], "161 km | color=#32CD66")
 
     def test_remote_menu_injection_removed(self):
         value = app.safe_text("---evil\nOpen | shell=/bin/sh\nparam1=bad")

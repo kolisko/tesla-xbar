@@ -557,7 +557,10 @@ def render(cache, config, demo=False):
     unverified = offline or stale or bool(cache.get("error"))
     charging = charging_is_current(cache, config)
     suffix = " ⚡" if charging else ""
-    color = UNVERIFIED_TEXT_COLOR if unverified else battery_color(cache)
+    connected = cable_connected(charge)
+    color = battery_color(cache)
+    if unverified and connected is not True:
+        color = UNVERIFIED_TEXT_COLOR
     distance = vehicle_range(cache)
     value = (f"{level:g}%" if level is not None else None) if config.get("display_mode") == "percent" else distance
     top = f"{'DEMO ' if demo else ''}{value if value is not None else '—'}{suffix}"
@@ -571,7 +574,6 @@ def render(cache, config, demo=False):
             lines.append("Range or distance units are not available yet. | color=gray")
         if number(charge.get("charge_limit_soc")):
             lines.append(f"Charge limit: {charge['charge_limit_soc']:g} %")
-        connected = cable_connected(charge)
         if connected is not None:
             lines.append(("Last known cable state: " if unverified else "Cable: ")
                          + ("connected" if connected else "disconnected"))
@@ -601,7 +603,8 @@ def render(cache, config, demo=False):
     if cache.get("wake_in_progress"):
         lines.append("Waking the vehicle and waiting for it to connect… | color=gray")
     if unverified and value is not None:
-        lines.append("Gray text marks a last known or unverified reading. | color=gray")
+        lines.append(("Green text reflects the last known cable connection." if connected is True
+                      else "Gray text marks a last known or unverified reading.") + " | color=gray")
     report = read_json("command-result.json")
     if report and report.get("vin") in (None, cache.get("vin")):
         stamp = dt.datetime.fromtimestamp(report.get("at", 0)).strftime("%H:%M")

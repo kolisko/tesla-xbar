@@ -32,15 +32,17 @@ class ReliabilityTests(unittest.TestCase):
                 result = app.main()
         return result, output.getvalue(), factory
 
-    def test_unavailable_readings_are_gray_without_icons_even_when_data_is_missing(self):
+    def test_unavailable_readings_follow_last_known_cable_without_icons(self):
         baseline = self.seed()
         for state in ("asleep", "offline", "unknown", None):
-            for charge, gui in ((baseline["charge"], baseline["gui_settings"]),
-                                (baseline["charge"], {}), ({}, {})):
+            for charge, gui, color in ((baseline["charge"], baseline["gui_settings"], "#32CD66"),
+                                       (baseline["charge"], {}, "#32CD66"), ({}, {}, "#A0A6AD"),
+                                       (baseline["charge"] | {"charging_state": "Disconnected"},
+                                        baseline["gui_settings"], "#A0A6AD")):
                 cache = baseline | {"state": state, "charge": charge, "gui_settings": gui}
                 top = app.render(cache, self.config).splitlines()[0]
                 value = "161 km" if gui else "—"
-                self.assertEqual(top, f"{value} | color=#A0A6AD")
+                self.assertEqual(top, f"{value} | color={color}")
         for state in ("asleep", "offline"):
             self.assertEqual(app.render({"state": state}, self.config).splitlines()[0],
                              "— | color=#A0A6AD")
@@ -77,8 +79,11 @@ class ReliabilityTests(unittest.TestCase):
             self.assertEqual(client.calls, ["/api/1/vehicles"])
             for mode, value in (("range", "161 km"), ("percent", "72%")):
                 menu = app.render(cache, self.config | {"display_mode": mode})
-                self.assertEqual(menu.splitlines()[0], f"{value} | color=#A0A6AD")
+                self.assertEqual(menu.splitlines()[0], f"{value} | color=#32CD66")
                 self.assertIn("Battery reading from", menu)
+                self.assertIn("Last known cable state: connected", menu)
+                self.assertIn("Green text reflects the last known cable connection.", menu)
+                self.assertNotIn("Gray text marks", menu)
                 self.assertIn(f"Vehicle {state}", menu)
                 self.assertNotIn("☾", menu)
                 self.assertNotIn("⛓️‍💥", menu)
@@ -94,7 +99,7 @@ class ReliabilityTests(unittest.TestCase):
         self.assertEqual(client.commands, [])
         capabilities.assert_not_called()
 
-    def test_failed_or_expired_online_readings_mute_colors_until_fresh(self):
+    def test_failed_or_expired_readings_keep_connected_green_without_live_lightning(self):
         with patch.object(app.time, "time", return_value=10_000):
             cache = self.seed()
             for charging_state, color in (("Charging", "#32CD66"), ("Stopped", "#32CD66"),
@@ -103,11 +108,30 @@ class ReliabilityTests(unittest.TestCase):
                 for changes in ({"error": "Network unavailable"},
                                 {"updated_at": 10_000 - app.STALE_AFTER_SECONDS}):
                     with self.subTest(charging_state=charging_state, changes=changes):
+                        cached_color = "#A0A6AD" if charging_state == "Disconnected" else "#32CD66"
                         self.assertEqual(app.render(cache | changes, self.config).splitlines()[0],
-                                         "161 km | color=#A0A6AD")
+                                         f"161 km | color={cached_color}")
                 suffix = " ⚡" if charging_state == "Charging" else ""
                 self.assertEqual(app.render(cache, self.config).splitlines()[0],
                                  f"161 km{suffix} | color={color}")
+
+    def test_fresh_disconnect_replaces_saved_connected_green(self):
+        self.seed()
+        cache = app.fetch_state(self.config, client=FakeClient(state="offline"))
+        self.assertEqual(app.render(cache, self.config).splitlines()[0], "161 km | color=#32CD66")
+        client = FakeClient()
+        original = client.get
+        def get(path):
+            result = original(path)
+            if "vehicle_data?" in path:
+                result["response"]["charge_state"]["charging_state"] = "Disconnected"
+            return result
+        with patch.object(client, "get", side_effect=get):
+            cache = app.fetch_state(self.config, client=client)
+        menu = app.render(cache, self.config)
+        self.assertEqual(menu.splitlines()[0], "161 km | color=#EF4444")
+        self.assertIn("Cable: disconnected", menu)
+        self.assertNotIn("Last known cable state", menu)
 
     def test_429_uses_exact_server_delay_and_retries_at_deadline(self):
         client = FakeClient()

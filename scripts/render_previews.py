@@ -54,15 +54,16 @@ body += divider(944) + text(27, 989, 'xbar', 25)
 body += '<path d="m562 972 7 7-7 7" fill="none" stroke="#e5e9ed" stroke-width="2.5"/>'
 (OUT / 'menu.svg').write_text(svg(600, 1030, body))
 
-body = '<rect width="1000" height="380" rx="20" fill="#111c29"/>'
+body = '<rect width="1326" height="380" rx="20" fill="#111c29"/>'
 examples = [('Charging', '360 km', '#32cd66', 'bolt'), ('Connected · paused', '360 km', '#32cd66', ''),
             ('Unplugged · below 350 km', '320 km', '#f5a623', ''), ('Unplugged · below 300 km', '280 km', '#ef4444', ''),
-            ('Asleep · last known range', '360 km', '#a0a6ad', ''), ('Offline · last known range', '360 km', '#a0a6ad', '')]
+            ('Asleep · last connected', '360 km', '#32cd66', ''), ('Offline · last connected', '360 km', '#32cd66', ''),
+            ('Asleep · last unplugged', '360 km', '#a0a6ad', ''), ('Offline · last unplugged', '360 km', '#a0a6ad', '')]
 for i, (label, value, color, icon) in enumerate(examples):
-    x, y = 20+(i%3)*326, 20+(i//3)*178
+    x, y = 20+(i%4)*326, 20+(i//4)*178
     body += f'<rect x="{x}" y="{y}" width="308" height="158" rx="14" fill="#1b2c3e"/>'
     body += text(x+20, y+40, label, 18, '#b4c6d7')
     body += text(x+20, y+109, value, 34, color)
     if icon=='bolt':body+=bolt(x+164,y+76,0.9)
-(OUT / 'states.svg').write_text(svg(1000, 380, body))
+(OUT / 'states.svg').write_text(svg(1326, 380, body))
 print('Created three SVG previews using fictional data only.')
