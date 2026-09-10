@@ -16,14 +16,14 @@ Open the menu to see battery percentage, Tesla's range, charge limit, cable conn
 
 *Illustrated previews with fictional data and a neutral background. Native fonts, emoji and transparency vary with macOS and xBar. No personal desktop screenshots are included.*
 
-<img src="docs/images/states.png" alt="Six display states: charging, connected but paused, orange low range, red low range, asleep and offline" width="1000">
+<img src="docs/images/states.png" alt="Eight display examples: charging, connected but paused, orange and red low range, and asleep or offline with a last known connected or unplugged cable" width="1000">
 
 ## Features
 
 - **Range or percentage:** switch through **Menu bar display**. Range comes directly from Tesla's range fields and uses the vehicle's distance units.
 - **Cable and charging status:** green when connected, including scheduled or paused charging; a lightning symbol marks fresh online charging data.
 - **Low-range colors:** orange below 350 km and red below 300 km when unplugged. Connected cable status takes precedence.
-- **Last known data:** asleep, offline and unverified readings keep the saved range or percentage in muted gray, without a status icon or dot. The connection state and original reading timestamp stay visible in the menu. Gray also marks a failed refresh or a reading at least 30 minutes old.
+- **Last known data:** asleep, offline and unverified readings keep the saved range or percentage without a status icon or dot. A last known connected cable keeps the text green; otherwise it becomes muted gray. This also applies after a failed refresh or when a reading is at least 30 minutes old. The connection state and original reading timestamp stay visible in the menu.
 - **One refresh schedule:** xBar's filename controls polling (`1m`, `5m`, etc.). **Refresh now** uses the same path. No second polling timer or invented monthly quota.
 - **Explicit commands:** wake and refresh, start/stop charging, and open/close the charge port. Normal refresh never sends a wake command.
 - **Private profiles:** tokens and Client Secret in Keychain; configuration, signing key and cached readings in the current user's Application Support directory.
@@ -131,7 +131,8 @@ GitHub checks include **CodeQL for Python and Swift, Gitleaks, a privacy scan, D
 
 ## Behavior and limits
 
-- Offline is not proof of sleep. An HTTP 408 is treated as unavailable. The menu distinguishes confirmed sleep from offline status; both use muted gray text in the menu bar.
+- Offline is not proof of sleep. An HTTP 408 is treated as unavailable. The menu distinguishes confirmed sleep from offline status. Both keep green text when the last known cable state is connected, and use muted gray otherwise.
+- Green can reflect a saved cable connection. A disconnection cannot be reflected until new vehicle data is received; the menu labels the saved state as **Last known cable state**. Only confirmed live charging gets a lightning symbol.
 - An offline/asleep reading can be old. The plugin keeps it and shows its timestamp; it never fabricates a fresh value.
 - Range is never estimated from battery percentage. API miles are converted to kilometers only when required by the vehicle's units.
 - Range/percentage selection is local. Automatic synchronization with the Tesla mobile app's display preference is not implemented.
