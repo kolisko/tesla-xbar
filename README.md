@@ -20,7 +20,7 @@ Open the menu to see battery percentage, Tesla's range, charge limit, cable conn
 
 <img src="docs/images/status-icons.png" alt="Matching monochrome charging bolt, Camp Mode tent, Pet Mode paw, climate fan and unlocked padlock before the range" width="940">
 
-Open **Clima** to change climate modes, turn climate on or off, or set the temperature for both front zones.
+Open **Clima** to see inside and outside temperatures, change climate modes, turn climate on or off, or set the target temperature for both front zones. Measured temperatures are shown separately from **Target temperature**.
 
 <img src="docs/images/clima.png" alt="Clima submenu with Keep, Camp and Pet modes, temperature selection and full shutdown" width="420">
 
@@ -66,7 +66,7 @@ flowchart TD
 
 A normal refresh checks vehicle availability and reads live data when available; otherwise it retains the last known reading. Wake is a separate, explicit action. The Python application sends ordinary API requests itself and delegates commands requiring signatures to the Go helper.
 
-The same `vehicle_data` request includes `charge_state`, `gui_settings`, `climate_state` and `vehicle_state`. Climate and lock indicators require no additional API calls or permissions beyond the existing vehicle-data access. Saved climate fields are limited to the keeper mode, on/off state, both front temperature settings and the vehicle's available temperature limits; the saved lock field is `locked`. Each section keeps its own reading timestamp. Clima actions use the existing `vehicle_cmds` scope and paired signing key, where required. See [Tesla's documented commands](https://developer.tesla.com/docs/fleet-api/endpoints/vehicle-commands).
+The same `vehicle_data` request includes `charge_state`, `gui_settings`, `climate_state` and `vehicle_state`. Climate and lock indicators require no additional API calls or permissions beyond the existing vehicle-data access. Saved climate fields are limited to the keeper mode, on/off state, inside/outside temperatures, both front temperature settings and the vehicle's available temperature limits; the saved lock field is `locked`. Each section keeps its own reading timestamp. Clima actions use the existing `vehicle_cmds` scope and paired signing key, where required. See [Tesla's documented commands](https://developer.tesla.com/docs/fleet-api/endpoints/vehicle-commands).
 
 Browser sign-in starts a temporary HTTP listener on the Mac's loopback interface, using the configured callback port. It closes when sign-in completes or times out. Later refreshes renew tokens as needed without opening a browser. The public HTTPS site serves only the **public key**: it does not relay the callback, run the plugin or store credentials.
 

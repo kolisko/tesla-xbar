@@ -44,14 +44,14 @@ class StatusIconTests(unittest.TestCase):
     def test_status_fields_share_battery_request_and_filter_private_response(self):
         client = StatusClient({
             "climate_state": {"climate_keeper_mode": "camp", "is_climate_on": True,
-                              "timestamp": (self.now - 5) * 1000, "inside_temp": 22},
+                              "timestamp": (self.now - 5) * 1000, "fan_speed": 3},
             "vehicle_state": {"locked": False, "timestamp": (self.now - 10) * 1000,
                               "odometer": 1000, "vehicle_name": "Private name"}})
         cache = app.fetch_state(self.config, client=client)
         self.assertEqual(len(client.calls), 2)
         self.assertEqual(cache["climate"], {"climate_keeper_mode": "camp", "is_climate_on": True, "updated_at": self.now - 5})
         self.assertEqual(cache["vehicle_status"], {"locked": False, "updated_at": self.now - 10})
-        for excluded in ("inside_temp", "odometer", "vehicle_name", "latitude"):
+        for excluded in ("fan_speed", "odometer", "vehicle_name", "latitude"):
             self.assertNotIn(excluded, json.dumps(cache))
         self.assertEqual(app.active_status_icons(cache), ["charging", "camp", "fan", "unlocked"])
 

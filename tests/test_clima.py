@@ -41,6 +41,7 @@ class ClimateClient(CommandClient):
         if "vehicle_data?" in path:
             climate = {"climate_keeper_mode": self.mode, "is_climate_on": self.power,
                        "driver_temp_setting": self.temperature, "passenger_temp_setting": self.temperature,
+                       "inside_temp": 20.5, "outside_temp": -3.5,
                        "timestamp": (self.timestamp if self.timestamp is not None else time.time()) * 1000}
             if self.limits is not None:
                 climate.update(min_avail_temp=self.limits[0], max_avail_temp=self.limits[1])
@@ -90,6 +91,23 @@ class ClimaTests(unittest.TestCase):
         self.assertEqual((climate["driver_temp_setting"], climate["passenger_temp_setting"]), (22.5, 22.5))
         self.assertFalse(client.power)
         self.assertIn("22.5 °C • confirmed", app.read_json("command-result.json")["message"])
+
+    def test_inside_outside_and_target_readings_are_distinct_and_keep_stale_labels(self):
+        client = ClimateClient()
+        cache = app.fetch_state(self.config, client)
+        self.assertEqual(cache["climate"]["inside_temp"], 20.5)
+        self.assertEqual(cache["climate"]["outside_temp"], -3.5)
+        menu = app.render(cache, self.config)
+        for line in ("--Inside temperature: 20.5 °C", "--Outside temperature: -3.5 °C", "--Target temperature: 21 °C"):
+            self.assertIn(line, menu)
+        for changes in ({"state": "offline"}, {"state": "asleep"}, {"error": "Network unavailable"}):
+            menu = app.render(cache | changes, self.config)
+            self.assertIn("--Last known inside temperature: 20.5 °C", menu)
+            self.assertIn("--Last known outside temperature: -3.5 °C", menu)
+        cache["climate"].update(inside_temp=0, outside_temp=None)
+        menu = app.render(cache, self.config)
+        self.assertIn("--Inside temperature: 0 °C", menu)
+        self.assertIn("--Outside temperature: unavailable", menu)
 
     def test_invalid_temperatures_are_rejected_before_any_vehicle_access(self):
         for value in (None, True, "nan", "inf", "-inf", "1e308", "22;anything", "22.25"):

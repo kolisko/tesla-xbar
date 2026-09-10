@@ -69,18 +69,19 @@ for i, (label, value, color, icon) in enumerate(examples):
     if icon == 'bolt':
         body += bolt(x+20, y+82, 1.8)
 (OUT / 'states.svg').write_text(svg(1326, 380, body))
-body = '<rect width="600" height="630" rx="18" fill="#202932"/>'
+body = '<rect width="600" height="702" rx="18" fill="#202932"/>'
 body += text(28, 42, 'Clima', 25, weight=600)
-for y, label in [(88, 'Climate mode: Camp Mode'), (124, 'Climate: on'), (160, 'Temperature: 22 °C')]:
+for y, label in [(88, 'Climate mode: Camp Mode'), (124, 'Climate: on'), (160, 'Target temperature: 22 °C'),
+                 (196, 'Inside temperature: 20.5 °C'), (232, 'Outside temperature: 19 °C')]:
     body += text(28, y, label, 22, '#a0a6ad')
-body += divider(183)
-for y, label in [(228, 'Turn climate on'), (275, 'Keep Climate On'), (322, '✓ Camp Mode'),
-                 (369, 'Pet Mode'), (416, 'Set temperature (°C)')]:
+body += divider(255)
+for y, label in [(300, 'Turn climate on'), (347, 'Keep Climate On'), (394, '✓ Camp Mode'),
+                 (441, 'Pet Mode'), (488, 'Set temperature (°C)')]:
     body += text(28, y, label, 24)
-body += '<path d="m562 399 7 7-7 7" fill="none" stroke="#e5e9ed" stroke-width="2.5"/>'
-body += divider(448)
-body += text(28, 491, 'Turn modes off', 24)
-body += text(28, 538, 'Turn climate and modes off', 24)
-body += text(28, 595, 'Illustrative data · Temperature sets both front zones', 17, '#a0a6ad')
-(OUT / 'clima.svg').write_text(svg(600, 630, body))
+body += '<path d="m562 471 7 7-7 7" fill="none" stroke="#e5e9ed" stroke-width="2.5"/>'
+body += divider(520)
+body += text(28, 563, 'Turn modes off', 24)
+body += text(28, 610, 'Turn climate and modes off', 24)
+body += text(28, 667, 'Illustrative data · Temperature sets both front zones', 17, '#a0a6ad')
+(OUT / 'clima.svg').write_text(svg(600, 702, body))
 print('Created four SVG previews using fictional data only.')

@@ -86,6 +86,10 @@ the vehicle, and sets both front zones in 0.5 °C steps. If limits are missing,
 refresh while the vehicle is online. Setting a temperature alone does not turn
 climate on. A clicked command can wake the vehicle; routine refresh cannot.
 
+**Inside temperature** and **Outside temperature** show Tesla's measured readings,
+separately from **Target temperature**. Unavailable readings are labeled as such;
+saved readings from an offline/asleep vehicle or a failed refresh use **Last known**.
+
 When upgrading from a version without Clima controls, use the full installer
 (`python3 -m scripts.install`) to rebuild the command helper with its mode adapter.
 

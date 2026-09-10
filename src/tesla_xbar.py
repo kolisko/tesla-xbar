@@ -386,7 +386,8 @@ def fetch_state(config, client=None):
             cache["updated_at"] = min(now, timestamp / 1000) if number(timestamp) and timestamp > 0 else now
             for source, destination, fields in (
                 ("climate_state", "climate", ("climate_keeper_mode", "is_climate_on", "driver_temp_setting",
-                                              "passenger_temp_setting", "min_avail_temp", "max_avail_temp")),
+                                              "passenger_temp_setting", "min_avail_temp", "max_avail_temp",
+                                              "inside_temp", "outside_temp")),
                 ("vehicle_state", "vehicle_status", ("locked",)),
             ):
                 data = response.get(source)
@@ -699,10 +700,17 @@ def clima_menu(cache, vehicle_action):
         if "climate" in line.lower():
             lines.append("--" + line + " | color=gray")
     driver, passenger = climate.get("driver_temp_setting"), climate.get("passenger_temp_setting")
-    label = "Temperature" if current else "Last known temperature"
+    label = "Target temperature" if current else "Last known target temperature"
     if number(driver) and number(passenger):
         value = f"{driver:g} °C" if driver == passenger else f"driver {driver:g} °C / passenger {passenger:g} °C"
         lines.append(f"--{label}: {value} | color=gray")
+    for field, label in (("inside_temp", "Inside temperature"), ("outside_temp", "Outside temperature")):
+        value = climate.get(field)
+        if number(value):
+            label = label if current else "Last known " + label.lower()
+            lines.append(f"--{label}: {value:g} °C | color=gray")
+        else:
+            lines.append(f"--{label}: unavailable | color=gray")
     lines.append("-----")
     for command in ("climate-on", "climate-keep", "climate-camp", "climate-pet"):
         expected = CLIMATE_MODES.get(command, ("off",))[0]
