@@ -69,6 +69,13 @@ If you have multiple vehicles, choose **Select vehicle** in the menu. **Menu bar
 
 Reading battery data does not require adding a virtual key to the vehicle. Many vehicles require the app's key for signed charging and charge-port commands.
 
+Camp Mode, Pet Mode, running climate and unlocked-vehicle indicators use the same
+vehicle-data permission as battery readings. They need no additional consent or
+virtual-key pairing. After updating, they appear when the next successful online
+refresh supplies the relevant fields. The fan means `is_climate_on` is true;
+an open padlock means `locked` is explicitly false. Missing or old information
+does not activate an icon. These are status indicators, not climate or lock controls.
+
 Choose **Charging and port → Add key to vehicle…**, open the link on a phone with the Tesla app and approve the key for the correct vehicle. The link uses your configured domain. Then choose **Check command setup**.
 
 Test physical commands yourself when appropriate. **Start charging**, **Stop charging** and port actions can wake the vehicle. Ordinary **Refresh now** does not send wake commands. Opening a port is not a physical cable-removal mechanism.

@@ -33,6 +33,7 @@ REDIRECT = "http://localhost:8765/callback"
 DEFAULTS = {"region": "eu", "redirect_uri": REDIRECT, "display_mode": "range"}
 STALE_AFTER_SECONDS = 30 * 60
 UNVERIFIED_TEXT_COLOR = "#A0A6AD"
+STATUS_ICON_ORDER = ("camp", "pet", "fan", "unlocked")
 VEHICLE_COMMANDS = {
     "charge-start": ("charging-start", "Start charging", "charge_start"),
     "charge-stop": ("charging-stop", "Stop charging", "charge_stop"),
@@ -323,12 +324,12 @@ def fetch_state(config, client=None):
         cache.pop("retry_at", None)
         cache.pop("retry_status", None)
         if cache["state"] == "online":
-            path = "/api/1/vehicles/" + urllib.parse.quote(selected["vin"], safe="") + "/vehicle_data?endpoints=charge_state%3Bgui_settings"
+            path = "/api/1/vehicles/" + urllib.parse.quote(selected["vin"], safe="") + "/vehicle_data?endpoints=charge_state%3Bgui_settings%3Bclimate_state%3Bvehicle_state"
             response = client.get(path).get("response")
             charge = response.get("charge_state") if isinstance(response, dict) else None
             if not isinstance(charge, dict) or not number(charge.get("battery_level")) or not 0 <= charge["battery_level"] <= 100:
                 raise AppError("Tesla has not provided battery data yet.")
-            # Keep charging fields and display preferences, never the full response.
+            # Keep only the fields used by the UI, never the full response.
             keys = ("battery_level", "usable_battery_level", "battery_range", "ideal_battery_range", "charge_limit_soc",
                     "charging_state", "conn_charge_cable", "charger_power", "minutes_to_full_charge", "time_to_full_charge",
                     "charge_port_door_open")
@@ -338,6 +339,17 @@ def fetch_state(config, client=None):
                                      if key in gui} if isinstance(gui, dict) else {}
             timestamp = charge.get("timestamp")
             cache["updated_at"] = min(now, timestamp / 1000) if number(timestamp) and timestamp > 0 else now
+            for source, destination, fields in (
+                ("climate_state", "climate", ("climate_keeper_mode", "is_climate_on")),
+                ("vehicle_state", "vehicle_status", ("locked",)),
+            ):
+                data = response.get(source)
+                snapshot = {key: data[key] for key in fields if key in data} if isinstance(data, dict) else {}
+                if snapshot:
+                    timestamp = data.get("timestamp")
+                    snapshot["updated_at"] = min(now, timestamp / 1000) if number(timestamp) and timestamp > 0 else now
+                # Missing fields must not make an older active state look fresh.
+                cache[destination] = snapshot
     except AppError as exc:
         cache["error"] = str(exc)
         cache["retry_status"] = exc.status if isinstance(exc, APIError) else None
@@ -533,6 +545,61 @@ def charging_is_current(cache, config):
             and time.time() < fresh_until)
 
 
+def status_is_current(cache, section):
+    data = cache.get(section) or {}
+    timestamp = data.get("updated_at")
+    return (cache.get("state") == "online" and not cache.get("error")
+            and number(timestamp) and 0 <= time.time() - timestamp < STALE_AFTER_SECONDS)
+
+
+def climate_mode(cache):
+    value = (cache.get("climate") or {}).get("climate_keeper_mode")
+    return value.strip().lower() if isinstance(value, str) else None
+
+
+def active_status_icons(cache):
+    icons = []
+    if status_is_current(cache, "climate"):
+        mode = climate_mode(cache)
+        if mode == "camp":
+            icons.append("camp")
+        elif mode in ("dog", "pet"):
+            icons.append("pet")
+        if cache["climate"].get("is_climate_on") is True:
+            icons.append("fan")
+    if status_is_current(cache, "vehicle_status") and cache["vehicle_status"].get("locked") is False:
+        icons.append("unlocked")
+    return icons
+
+
+def status_icon_image(icons):
+    names = [name for name in STATUS_ICON_ORDER if name in icons]
+    if not names or ("camp" in names and "pet" in names):
+        return ""
+    try:
+        return base64.b64encode((HERE / "icons" / ("-".join(names) + ".png")).read_bytes()).decode("ascii")
+    except OSError:
+        return ""  # Textual status remains available if an asset is missing.
+
+
+def status_menu_lines(cache):
+    lines = []
+    climate = cache.get("climate") or {}
+    current = status_is_current(cache, "climate")
+    mode = {"camp": "Camp Mode", "dog": "Pet Mode", "pet": "Pet Mode", "on": "Keep Climate On", "off": "Off"}.get(climate_mode(cache))
+    if mode is not None:
+        label = "Climate mode" if current else "Last known climate mode"
+        lines.append(f"{label}: {mode}")
+    if isinstance(climate.get("is_climate_on"), bool):
+        label = "Climate" if current else "Last known climate"
+        lines.append(f"{label}: {'on' if climate['is_climate_on'] else 'off'}")
+    vehicle = cache.get("vehicle_status") or {}
+    if isinstance(vehicle.get("locked"), bool):
+        label = "Vehicle" if status_is_current(cache, "vehicle_status") else "Last known vehicle lock"
+        lines.append(f"{label}: {'locked' if vehicle['locked'] else 'unlocked'}")
+    return lines
+
+
 def publish_display(cache, config, menu):
     """Publish a private text snapshot for the fast renderer, without credentials."""
     pulse_until = (cache.get("updated_at", 0) + STALE_AFTER_SECONDS
@@ -564,7 +631,11 @@ def render(cache, config, demo=False):
     distance = vehicle_range(cache)
     value = (f"{level:g}%" if level is not None else None) if config.get("display_mode") == "percent" else distance
     top = f"{'DEMO ' if demo else ''}{value if value is not None else '—'}{suffix}"
-    lines = [top + (f" | color={color}" if color else ""), "---",
+    params = [f"color={color}"] if color else []
+    icon_image = status_icon_image(active_status_icons(cache))
+    if icon_image:
+        params.append(f"templateImage={icon_image}")
+    lines = [top + (" | " + " ".join(params) if params else ""), "---",
              safe_text(cache.get("name", "Tesla xBar")) + " | size=15"]
     if level is not None:
         lines.append(f"Battery: {level:g} %")
@@ -592,6 +663,7 @@ def render(cache, config, demo=False):
         lines.append(f"Battery reading from {stamp} | color=gray")
     else:
         lines.append("Battery data is not available yet.")
+    lines.extend(status_menu_lines(cache))
     if cache.get("state") == "asleep":
         lines.append("Vehicle asleep • last known data | color=gray")
     elif cache.get("state") == "offline":
