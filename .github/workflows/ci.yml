@@ -85,4 +85,4 @@ jobs:
       - name: Build pinned SDK
         run: python3 -m scripts.build_commands
       - name: Check reachable dependency vulnerabilities
-        run: GOFLAGS="-overlay=$PWD/build/command-overlay.json" go run golang.org/x/vuln/cmd/govulncheck@v1.7.0 -C build/vehicle-command ./cmd/tesla-control
+        run: python3 -m scripts.audit_commands

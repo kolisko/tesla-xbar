@@ -12,4 +12,5 @@ arguments without contacting a vehicle.
 overlay to add these files to the CLI package without modifying the verified SDK
 checkout. It runs the adapter tests and builds `build/tesla-control`. The generated
 `build/command-overlay.json` contains local paths and is never committed. The
-dependency audit uses the same overlay.
+dependency audit materializes the same adapter in a temporary copy of the SDK
+because govulncheck's source parser does not support virtual overlay files.

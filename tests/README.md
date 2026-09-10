@@ -10,6 +10,7 @@ These tests use fake Tesla clients and temporary local profiles. They do not req
 | [`test_install.py`](test_install.py) | Installation, generated launchers, private-key handling and preservation of profiles, helpers and refresh intervals. |
 | [`test_status_icons.py`](test_status_icons.py) | Camp/Pet/climate/unlock field selection, section freshness, partial responses, offline behavior and prebuilt menu-bar image combinations. |
 | [`test_clima.py`](test_clima.py) | Climate mode and power transitions, temperature validation, signed/legacy command parameters, scope checks, partial failures, acknowledgement versus confirmation and menu argument routing. |
+| [`test_command_audit.py`](test_command_audit.py) | The dependency audit's source copy includes the adapter and preserves the pinned SDK checkout. |
 
 Run the full suite from the repository root:
 
