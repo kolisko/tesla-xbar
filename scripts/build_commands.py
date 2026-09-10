@@ -1,5 +1,6 @@
 """Build a pinned version of Tesla's official command-line tool."""
 import os
+import json
 from pathlib import Path
 import subprocess
 
@@ -22,8 +23,16 @@ def build_commands():
         raise RuntimeError("Tesla SDK checkout does not match the pinned revision.")
     subprocess.run(["git", "-C", str(checkout), "diff", "--exit-code", "HEAD", "--"], check=True)
     env = os.environ | {"GOCACHE": str(build / "go-cache"), "GOMODCACHE": str(build / "go-modules"), "GOTOOLCHAIN": "local"}
+    overlay = build / "command-overlay.json"
+    adapter = Path(__file__).resolve().parents[1] / "src" / "commands"
+    replacements = {str(checkout / "cmd" / "tesla-control" / ("xbar_" + source.name)): str(source)
+                    for source in adapter.glob("*.go")}
+    overlay.write_text(json.dumps({"Replace": replacements}))
+    subprocess.run(["go", "test", "-C", str(checkout), "-overlay", str(overlay),
+                    "-run", "TestXBarClimateKeeperMode", "./cmd/tesla-control"], env=env, check=True)
     binary = build / "tesla-control"
-    subprocess.run(["go", "build", "-C", str(checkout), "-trimpath", "-o", str(binary), "./cmd/tesla-control"], env=env, check=True)
+    subprocess.run(["go", "build", "-C", str(checkout), "-overlay", str(overlay),
+                    "-trimpath", "-o", str(binary), "./cmd/tesla-control"], env=env, check=True)
     return binary
 
 

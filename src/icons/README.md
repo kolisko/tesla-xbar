@@ -1,10 +1,11 @@
 # Status icons
 
-Editable SVG artwork and prebuilt Retina PNG template images for Camp Mode,
-Pet Mode, running climate, and an unlocked vehicle. The PNG strips cover every
+Editable SVG artwork and prebuilt Retina PNG template images for charging, Camp
+Mode, Pet Mode, running climate, and an unlocked vehicle. The 23 PNG strips cover every
 valid combination (Camp and Pet Mode are mutually exclusive).
 
-xBar places the monochrome strip before the range or percentage. macOS chooses
+xBar places all icons, including the charging bolt, in the same monochrome strip
+before the range or percentage. macOS chooses
 the template tint for the current appearance. Each icon is 16 points tall;
 the PNG carries 144 DPI density for its 32-pixel Retina representation.
 

@@ -74,7 +74,20 @@ vehicle-data permission as battery readings. They need no additional consent or
 virtual-key pairing. After updating, they appear when the next successful online
 refresh supplies the relevant fields. The fan means `is_climate_on` is true;
 an open padlock means `locked` is explicitly false. Missing or old information
-does not activate an icon. These are status indicators, not climate or lock controls.
+does not activate an icon. Climate controls are available separately under **Clima**;
+the unlock indicator does not add lock/unlock controls.
+
+The **Clima** submenu provides normal climate, Keep Climate On, Camp Mode, Pet Mode,
+temperature selection, modes off and full climate/modes off. These actions use
+`vehicle_cmds`; reconnect with **Vehicle Commands** enabled if Tesla denies access.
+Signed commands also require the paired app key. Normal climate and full shutdown
+first exit the active keeper mode. Temperature is in °C, uses limits returned by
+the vehicle, and sets both front zones in 0.5 °C steps. If limits are missing,
+refresh while the vehicle is online. Setting a temperature alone does not turn
+climate on. A clicked command can wake the vehicle; routine refresh cannot.
+
+When upgrading from a version without Clima controls, use the full installer
+(`python3 -m scripts.install`) to rebuild the command helper with its mode adapter.
 
 Choose **Charging and port → Add key to vehicle…**, open the link on a phone with the Tesla app and approve the key for the correct vehicle. The link uses your configured domain. Then choose **Check command setup**.
 

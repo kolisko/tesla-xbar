@@ -33,13 +33,22 @@ REDIRECT = "http://localhost:8765/callback"
 DEFAULTS = {"region": "eu", "redirect_uri": REDIRECT, "display_mode": "range"}
 STALE_AFTER_SECONDS = 30 * 60
 UNVERIFIED_TEXT_COLOR = "#A0A6AD"
-STATUS_ICON_ORDER = ("camp", "pet", "fan", "unlocked")
+STATUS_ICON_ORDER = ("charging", "camp", "pet", "fan", "unlocked")
 VEHICLE_COMMANDS = {
     "charge-start": ("charging-start", "Start charging", "charge_start"),
     "charge-stop": ("charging-stop", "Stop charging", "charge_stop"),
     "port-open": ("charge-port-open", "Open charge port", "charge_port_door_open"),
     "port-close": ("charge-port-close", "Close charge port", "charge_port_door_close"),
+    "climate-on": ("climate-on", "Turn climate on", "auto_conditioning_start"),
+    "climate-off": ("climate-off", "Turn climate and modes off", "auto_conditioning_stop"),
+    "climate-keep": ("climate-keeper", "Keep Climate On", "set_climate_keeper_mode"),
+    "climate-camp": ("climate-keeper", "Camp Mode", "set_climate_keeper_mode"),
+    "climate-pet": ("climate-keeper", "Pet Mode", "set_climate_keeper_mode"),
+    "climate-mode-off": ("climate-keeper", "Turn modes off", "set_climate_keeper_mode"),
+    "climate-set-temp": ("climate-set-temp", "Set temperature", "set_temps"),
 }
+CLIMATE_MODES = {"climate-keep": ("on", 1), "climate-pet": ("dog", 2),
+                 "climate-camp": ("camp", 3), "climate-mode-off": ("off", 0)}
 
 
 class AppError(Exception):
@@ -223,19 +232,28 @@ class Client:
         required = info.get("vehicle_command_protocol_required")
         if not isinstance(required, bool):
             raise AppError("Tesla did not confirm the command authorization method for this vehicle.")
+        scopes = self.granted_scopes()
         return {"vin": vin, "signing_required": required,
                 "key_paired": vin in response.get("key_paired_vins", []),
-                "charging_authorized": "vehicle_charging_cmds" in self.granted_scopes()}
+                "charging_authorized": "vehicle_charging_cmds" in scopes,
+                "vehicle_authorized": "vehicle_cmds" in scopes}
 
-    def vehicle_command(self, vin, command, capabilities):
-        if command not in VEHICLE_COMMANDS:
-            raise AppError("Unsupported command.")
+    def vehicle_command(self, vin, command, capabilities, temperature=None):
+        temperature = validate_command(command, temperature)
         cli_command, _, endpoint = VEHICLE_COMMANDS[command]
+        arguments, body = [], {}
+        if command in CLIMATE_MODES:
+            mode, code = CLIMATE_MODES[command]
+            arguments = [mode]
+            body = {"climate_keeper_mode": code, "manual_override": False}
+        elif command == "climate-set-temp":
+            arguments = [f"{temperature:g}C"]
+            body = {"driver_temp": temperature, "passenger_temp": temperature}
         if not capabilities["signing_required"]:
             path = "/api/1/vehicles/" + urllib.parse.quote(vin, safe="") + "/command/" + endpoint
-            response = self.request(path, body={}).get("response", {})
+            response = self.request(path, body=body).get("response", {})
             if response.get("result") is not True:
-                raise AppError(command_error(str(response.get("reason", ""))))
+                raise AppError(command_error(str(response.get("reason", "")), command))
             return
         if not capabilities["key_paired"]:
             raise AppError("First add the app key to your vehicle using the Tesla mobile app.")
@@ -245,7 +263,7 @@ class Client:
         token = self.access_token()
         args = [str(binary), "-token-file", "/dev/stdin", "-key-file", str(key),
                 "-vin", vin, "-session-cache", str(APP_DIR / "command-sessions.json"),
-                "-connect-timeout", "20s", "-command-timeout", "15s", cli_command]
+                "-connect-timeout", "20s", "-command-timeout", "15s", cli_command] + arguments
         # Tokens go through a pipe, never argv, environment or a temporary file.
         env = {k: v for k, v in os.environ.items() if not k.startswith("TESLA_")}
         env["TESLA_VERBOSE"] = "false"
@@ -256,7 +274,7 @@ class Client:
             raise AppError("The command result is unconfirmed. Check the vehicle status; the command will not be retried automatically.") from None
         if result.returncode:
             # The SDK may include sensitive context in errors. Never show raw output.
-            raise AppError(command_error(result.stderr + result.stdout))
+            raise AppError(command_error(result.stderr + result.stdout, command))
 
     def request(self, path, body=None):
         for attempt in range(2):
@@ -272,11 +290,38 @@ def number(value):
     return isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value)
 
 
-def command_error(text):
+def validate_command(command, temperature=None):
+    if command not in VEHICLE_COMMANDS:
+        raise AppError("Unsupported command.")
+    if command != "climate-set-temp":
+        if temperature is not None:
+            raise AppError("Temperature is only valid for the temperature command.")
+        return None
+    try:
+        value = float(temperature) if not isinstance(temperature, bool) else None
+    except (TypeError, ValueError, OverflowError):
+        value = None
+    if not number(value) or not number(value * 2) or value * 2 != round(value * 2):
+        raise AppError("Choose a temperature in 0.5 °C steps from the Clima menu.")
+    return value
+
+
+def temperature_limits(cache):
+    climate = cache.get("climate") or {}
+    low, high = climate.get("min_avail_temp"), climate.get("max_avail_temp")
+    # Bound menu size and reject malformed ranges; the actual limits come from Tesla.
+    if number(low) and number(high) and -50 <= low <= high <= 100 and high - low <= 50:
+        return low, high
+    return None
+
+
+def command_error(text, command=""):
     value = text.lower()
     for needles, message in (
         (("has not been paired", "not on whitelist", "unknown key"), "First add the app key to your vehicle using the Tesla mobile app."),
-        (("403", "forbidden", "insufficient scope"), "Tesla denied the command. Allow Vehicle Charging Management via Connect Tesla account."),
+        (("403", "forbidden", "insufficient scope"), "Tesla denied the command. Allow Vehicle Commands via Connect Tesla account."
+         if command.startswith("climate-") else "Tesla denied the command. Allow Vehicle Charging Management via Connect Tesla account."),
+        (("unrecognized command",), "Update the command helper: run python3 -m scripts.install from the project folder."),
         (("401", "unauthorized"), "Your session has expired. Connect your Tesla account again."),
         (("no_power", "no power"), "The charger is not supplying power."),
         (("disconnected",), "The charging cable is disconnected."),
@@ -340,7 +385,8 @@ def fetch_state(config, client=None):
             timestamp = charge.get("timestamp")
             cache["updated_at"] = min(now, timestamp / 1000) if number(timestamp) and timestamp > 0 else now
             for source, destination, fields in (
-                ("climate_state", "climate", ("climate_keeper_mode", "is_climate_on")),
+                ("climate_state", "climate", ("climate_keeper_mode", "is_climate_on", "driver_temp_setting",
+                                              "passenger_temp_setting", "min_avail_temp", "max_avail_temp")),
                 ("vehicle_state", "vehicle_status", ("locked",)),
             ):
                 data = response.get(source)
@@ -424,14 +470,15 @@ def command_setup(config, client=None):
     return capabilities
 
 
-def run_vehicle_command(config, command, client=None):
+def run_vehicle_command(config, command, client=None, temperature=None):
     """Explicit menu action only. Validate current vehicle, consent and key first."""
-    if command not in VEHICLE_COMMANDS:
-        raise AppError("Unsupported command.")
+    temperature = validate_command(command, temperature)
+    label = (f"Set temperature to {temperature:g} °C" if temperature is not None else VEHICLE_COMMANDS[command][1])
     client = client or Client(config)
     previous = read_json("cache.json")
     report = {"vin": previous.get("vin"), "command": command, "at": time.time(),
-              "message": "Running: " + VEHICLE_COMMANDS[command][1], "status": "pending"}
+              "message": "Running: " + label, "status": "pending"}
+    accepted = []
     save_json("command-result.json", report)
     try:
         config = pinned_vehicle_config(config)
@@ -440,6 +487,8 @@ def run_vehicle_command(config, command, client=None):
         report["vin"] = vin
         if command.startswith("charge-") and not capabilities["charging_authorized"]:
             raise AppError("Allow Vehicle Charging Management via Connect Tesla account.")
+        if command.startswith("climate-") and not capabilities.get("vehicle_authorized"):
+            raise AppError("Allow Vehicle Commands via Connect Tesla account.")
         if capabilities["signing_required"] and not capabilities["key_paired"]:
             raise AppError("First add the app key to your vehicle using the Tesla mobile app.")
         cache = read_json("cache.json")
@@ -447,6 +496,12 @@ def run_vehicle_command(config, command, client=None):
             cache = wake_and_refresh(config | {"vin": vin}, client=client)
         if cache.get("error") or cache.get("state") != "online":
             raise AppError(cache.get("error", "The vehicle is unavailable."))
+        if temperature is not None:
+            limits = temperature_limits(cache)
+            if not status_is_current(cache, "climate") or limits is None:
+                raise AppError("Tesla has not provided current temperature limits. Refresh and try again.")
+            if not limits[0] <= temperature <= limits[1]:
+                raise AppError(f"Choose a temperature from {limits[0]:g} to {limits[1]:g} °C.")
         charge = cache.get("charge") or {}
         connected = cable_connected(charge)
         if command == "charge-start" and connected is not True:
@@ -458,8 +513,18 @@ def run_vehicle_command(config, command, client=None):
         if already_done:
             message = "The vehicle is already charging." if command == "charge-start" else "Charging is already stopped."
         else:
-            client.vehicle_command(vin, command, capabilities)
-            message = "Command accepted: " + VEHICLE_COMMANDS[command][1]
+            sent_at = time.time()
+            # Normal climate and full shutdown must also exit Camp/Pet/Keep mode.
+            if command in ("climate-on", "climate-off") and not (
+                    status_is_current(cache, "climate") and climate_mode(cache) == "off"):
+                client.vehicle_command(vin, "climate-mode-off", capabilities)
+                accepted.append("climate-mode-off")
+            if temperature is None:
+                client.vehicle_command(vin, command, capabilities)
+            else:
+                client.vehicle_command(vin, command, capabilities, temperature=temperature)
+            accepted.append(command)
+            message = "Command accepted: " + label
             fresh = fetch_state(config | {"vin": vin}, client=client)
             state = fresh.get("charge", {}).get("charging_state")
             if not fresh.get("error") and fresh.get("state") == "online":
@@ -467,13 +532,39 @@ def run_vehicle_command(config, command, client=None):
                     message = "Charging started • confirmed by the vehicle."
                 elif command == "charge-stop" and state in ("Stopped", "Complete", "Disconnected", "NoPower"):
                     message = "Charging stopped • confirmed by the vehicle."
+                elif command.startswith("climate-") and climate_command_confirmed(fresh, command, temperature, sent_at):
+                    message = label + " • confirmed by the vehicle."
         report.update(status="success", message=message)
     except (AppError, OSError, subprocess.SubprocessError) as exc:
-        report.update(status="error", message=str(exc) if isinstance(exc, AppError) else "The command could not be completed.")
+        message = str(exc) if isinstance(exc, AppError) else "The command could not be completed."
+        if isinstance(exc, APIError) and exc.status == 403 and command.startswith("climate-"):
+            message = "Tesla denied the command. Allow Vehicle Commands via Connect Tesla account."
+        if accepted:
+            message = "Some commands were accepted; " + message
+            fetch_state(config | {"vin": report["vin"]}, client=client)
+        report.update(status="error", message=message)
     finally:
         report["at"] = time.time()
         save_json("command-result.json", report)
     return read_json("cache.json")
+
+
+def climate_command_confirmed(cache, command, temperature, sent_at):
+    climate = cache.get("climate") or {}
+    if not status_is_current(cache, "climate") or climate.get("updated_at", 0) < sent_at:
+        return False
+    mode = climate_mode(cache)
+    if command in CLIMATE_MODES:
+        expected = CLIMATE_MODES[command][0]
+        if mode == "pet":
+            mode = "dog"
+        return mode == expected and (expected == "off" or climate.get("is_climate_on") is True)
+    if command in ("climate-on", "climate-off"):
+        return mode == "off" and climate.get("is_climate_on") is (command == "climate-on")
+    if command == "climate-set-temp":
+        return all(number(climate.get(key)) and abs(climate[key] - temperature) < 0.1
+                   for key in ("driver_temp_setting", "passenger_temp_setting"))
+    return False
 
 
 def pinned_vehicle_config(config, menu_vin=None):
@@ -538,7 +629,7 @@ def battery_color(cache):
     return None  # Native text color: white in the user's dark menu bar.
 
 
-def charging_is_current(cache, config):
+def charging_is_current(cache, config=None):
     fresh_until = cache.get("updated_at", 0) + STALE_AFTER_SECONDS
     return (cache.get("charge", {}).get("charging_state") == "Charging"
             and cache.get("state") == "online" and not cache.get("error")
@@ -558,7 +649,7 @@ def climate_mode(cache):
 
 
 def active_status_icons(cache):
-    icons = []
+    icons = ["charging"] if charging_is_current(cache) else []
     if status_is_current(cache, "climate"):
         mode = climate_mode(cache)
         if mode == "camp":
@@ -600,6 +691,41 @@ def status_menu_lines(cache):
     return lines
 
 
+def clima_menu(cache, vehicle_action):
+    climate = cache.get("climate") or {}
+    current = status_is_current(cache, "climate")
+    lines = ["Clima"]
+    for line in status_menu_lines(cache):
+        if "climate" in line.lower():
+            lines.append("--" + line + " | color=gray")
+    driver, passenger = climate.get("driver_temp_setting"), climate.get("passenger_temp_setting")
+    label = "Temperature" if current else "Last known temperature"
+    if number(driver) and number(passenger):
+        value = f"{driver:g} °C" if driver == passenger else f"driver {driver:g} °C / passenger {passenger:g} °C"
+        lines.append(f"--{label}: {value} | color=gray")
+    lines.append("-----")
+    for command in ("climate-on", "climate-keep", "climate-camp", "climate-pet"):
+        expected = CLIMATE_MODES.get(command, ("off",))[0]
+        mode = "dog" if climate_mode(cache) == "pet" else climate_mode(cache)
+        checked = current and mode == expected and climate.get("is_climate_on") is True
+        label = ("✓ " if checked else "") + VEHICLE_COMMANDS[command][1]
+        lines.append("--" + vehicle_action(label, "command", command))
+    lines.extend(["--Set temperature (°C)", "----Both front zones | color=gray"])
+    limits = temperature_limits(cache)
+    if limits:
+        for half_degrees in range(math.ceil(limits[0] * 2), math.floor(limits[1] * 2) + 1):
+            temperature = half_degrees / 2
+            checked = current and driver == temperature and passenger == temperature
+            label = ("✓ " if checked else "") + f"{temperature:g} °C"
+            lines.append("----" + vehicle_action(label, "command", "climate-set-temp", "--temperature", f"{temperature:g}"))
+    else:
+        lines.append("----Refresh vehicle data to load temperature limits | color=gray")
+    lines.append("-----")
+    for command in ("climate-mode-off", "climate-off"):
+        lines.append("--" + vehicle_action(VEHICLE_COMMANDS[command][1], "command", command))
+    return lines
+
+
 def publish_display(cache, config, menu):
     """Publish a private text snapshot for the fast renderer, without credentials."""
     pulse_until = (cache.get("updated_at", 0) + STALE_AFTER_SECONDS
@@ -623,14 +749,13 @@ def render(cache, config, demo=False):
     offline = cache.get("state") != "online"
     unverified = offline or stale or bool(cache.get("error"))
     charging = charging_is_current(cache, config)
-    suffix = " ⚡" if charging else ""
     connected = cable_connected(charge)
     color = battery_color(cache)
     if unverified and connected is not True:
         color = UNVERIFIED_TEXT_COLOR
     distance = vehicle_range(cache)
     value = (f"{level:g}%" if level is not None else None) if config.get("display_mode") == "percent" else distance
-    top = f"{'DEMO ' if demo else ''}{value if value is not None else '—'}{suffix}"
+    top = f"{'DEMO ' if demo else ''}{value if value is not None else '—'}"
     params = [f"color={color}"] if color else []
     icon_image = status_icon_image(active_status_icons(cache))
     if icon_image:
@@ -695,11 +820,13 @@ def render(cache, config, demo=False):
     if setup.get("vin") == cache.get("vin") and setup.get("signing_required") and not setup.get("key_paired"):
         lines.append("--First add the app key to your vehicle | color=gray")
     for command, (_, label, _) in VEHICLE_COMMANDS.items():
-        lines.append("--" + vehicle_action(label, "command", command))
+        if not command.startswith("climate-"):
+            lines.append("--" + vehicle_action(label, "command", command))
     domain = config.get("domain", "")
     if domain and "/" not in domain and ":" not in domain:
         lines.append("--Add key to vehicle… | href=https://www.tesla.com/_ak/" + domain)
     lines.append("--" + vehicle_action("Check command setup", "command-setup"))
+    lines.extend(clima_menu(cache, vehicle_action))
     lines.extend(["---", "Refresh now | refresh=true",
                   vehicle_action("Wake vehicle and refresh", "wake-refresh"),
                   action("Connect Tesla account…", "authorize", terminal=True),
@@ -955,6 +1082,7 @@ def main():
     parser.add_argument("command", nargs="?", default="menu", choices=["menu", "refresh", "wake-refresh", "command", "command-setup", "configure", "provision", "register", "authorize", "select", "display", "demo"])
     parser.add_argument("value", nargs="?")
     parser.add_argument("--vin", help="Vehicle bound to the clicked menu item")
+    parser.add_argument("--temperature", help="Target Celsius temperature for climate-set-temp")
     parser.add_argument("--no-browser", action="store_true")
     args = parser.parse_args()
     config = DEFAULTS
@@ -977,7 +1105,7 @@ def main():
                 config = pinned_vehicle_config(configuration(), args.vin)
                 (APP_DIR / "action-notice.json").unlink(missing_ok=True)
                 if args.command == "command":
-                    cache = run_vehicle_command(config, args.value)
+                    cache = run_vehicle_command(config, args.value, temperature=args.temperature)
                 elif args.command == "wake-refresh":
                     cache = wake_and_refresh(config)
                 else:
@@ -985,6 +1113,8 @@ def main():
                     missing = []
                     if not ready["charging_authorized"]:
                         missing.append("Allow Vehicle Charging Management via Connect Tesla account.")
+                    if not ready.get("vehicle_authorized"):
+                        missing.append("Allow Vehicle Commands via Connect Tesla account.")
                     if ready["signing_required"] and not ready["key_paired"]:
                         missing.append("Add the app key to your vehicle using your phone.")
                     save_json("command-result.json", {"vin": ready["vin"], "at": time.time(),
