@@ -77,6 +77,11 @@ def install(source, target, plugins, *, runtime_only=False, python=None):
         for name, binary in helpers.items():
             atomic_install(binary.read_bytes(), target / name, 0o700)
         atomic_install((source / "src" / "tesla_xbar.py").read_bytes(), target / "tesla_xbar.py", 0o600)
+        icons = target / "icons"
+        icons.mkdir(exist_ok=True, mode=0o700)
+        os.chmod(icons, 0o700)
+        for icon in (source / "src" / "icons").glob("*.png"):
+            atomic_install(icon.read_bytes(), icons / icon.name, 0o600)
         launcher = ("#!/bin/bash\nexec " + shlex.quote(python or sys.executable) + " "
                     + shlex.quote(str(target / "tesla_xbar.py")) + ' "$@"\n')
         atomic_install(launcher.encode(), target / "tesla-action.sh", 0o700)

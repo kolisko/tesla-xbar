@@ -18,10 +18,13 @@ Open the menu to see battery percentage, Tesla's range, charge limit, cable conn
 
 <img src="docs/images/states.png" alt="Eight display examples: charging, connected but paused, orange and red low range, and asleep or offline with a last known connected or unplugged cable" width="1000">
 
+<img src="docs/images/status-icons.png" alt="Camp Mode tent, Pet Mode paw, running climate fan and unlocked padlock; a combined menu bar example" width="760">
+
 ## Features
 
 - **Range or percentage:** switch through **Menu bar display**. Range comes directly from Tesla's range fields and uses the vehicle's distance units.
 - **Cable and charging status:** green when connected, including scheduled or paused charging; a lightning symbol marks fresh online charging data.
+- **Live vehicle indicators:** a tent for Camp Mode, a paw for Pet Mode, a fan while climate is on, and an open padlock when the vehicle is unlocked. Active indicators appear together before the range or percentage; their names also appear in the menu.
 - **Low-range colors:** orange below 350 km and red below 300 km when unplugged. Connected cable status takes precedence.
 - **Last known data:** asleep, offline and unverified readings keep the saved range or percentage without a status icon or dot. A last known connected cable keeps the text green; otherwise it becomes muted gray. This also applies after a failed refresh or when a reading is at least 30 minutes old. The connection state and original reading timestamp stay visible in the menu.
 - **One refresh schedule:** xBar's filename controls polling (`1m`, `5m`, etc.). **Refresh now** uses the same path. No second polling timer or invented monthly quota.
@@ -51,11 +54,14 @@ flowchart TD
 | `tesla-battery.1m.sh` | Small shell entry point in xBar's plugin directory. Its filename supplies the refresh interval. |
 | `tesla-action.sh` | Generated shell launcher that uses the Python interpreter selected during installation. Menu actions also call this launcher. |
 | [`tesla_xbar.py`](src/tesla_xbar.py) | Python standard-library application: Fleet API requests, OAuth and token renewal, cached readings, menu rendering and action handling. |
+| [`icons/`](src/icons/README.md) | Prebuilt monochrome image strips for climate modes, running climate and an unlocked vehicle. Python includes the matching PNG in xBar's output; macOS supplies its tint. No runtime image renderer is needed. |
 | `tesla-keychain`, built from [`keychain.swift`](src/keychain.swift) | Small Swift executable that accesses macOS Keychain. Secrets are passed to it through stdin. |
 | `tesla-control`, built by [`build_commands.py`](scripts/build_commands.py) | Tesla's official Go command tool, built from a pinned revision. Python invokes it when a vehicle requires signed charging or charge-port commands. |
 | [`install.py`](scripts/install.py) | Builds the helpers, installs the runtime and launchers, and creates a signing key for a new profile. Updates reuse the existing private profile. |
 
 A normal refresh checks vehicle availability and reads live data when available; otherwise it retains the last known reading. Wake is a separate, explicit action. The Python application sends ordinary API requests itself and delegates commands requiring signatures to the Go helper.
+
+The same `vehicle_data` request includes `charge_state`, `gui_settings`, `climate_state` and `vehicle_state`. Climate and lock indicators require no additional API calls or permissions beyond the existing vehicle-data access. The saved climate fields are limited to `climate_keeper_mode` and `is_climate_on`; the saved lock field is `locked`. Each section keeps its own reading timestamp.
 
 Browser sign-in starts a temporary HTTP listener on the Mac's loopback interface, using the configured callback port. It closes when sign-in completes or times out. Later refreshes renew tokens as needed without opening a browser. The public HTTPS site serves only the **public key**: it does not relay the callback, run the plugin or store credentials.
 
@@ -65,7 +71,7 @@ Each directory has a Markdown guide describing its contents. Most use `README.md
 
 | Directory | Contents |
 | --- | --- |
-| [`src/`](src/README.md) | Python application and Swift Keychain helper source. |
+| [`src/`](src/README.md) | Python application, Swift Keychain helper and [status icon assets](src/icons/README.md). |
 | [`scripts/`](scripts/README.md) | Installer, pinned command-helper build, privacy check and preview generator. |
 | [`tests/`](tests/README.md) | Automated tests using fake Tesla clients and temporary profiles. |
 | [`examples/`](examples/README.md) | Placeholder configuration for your own setup. |
@@ -134,6 +140,7 @@ GitHub checks include **CodeQL for Python and Swift, Gitleaks, a privacy scan, D
 - Offline is not proof of sleep. An HTTP 408 is treated as unavailable. The menu distinguishes confirmed sleep from offline status. Both keep green text when the last known cable state is connected, and use muted gray otherwise.
 - Green can reflect a saved cable connection. A disconnection cannot be reflected until new vehicle data is received; the menu labels the saved state as **Last known cable state**. Only confirmed live charging gets a lightning symbol.
 - An offline/asleep reading can be old. The plugin keeps it and shows its timestamp; it never fabricates a fresh value.
+- Climate and unlock icons require an online vehicle, a successful refresh and a section timestamp less than 30 minutes old. They disappear for offline/asleep states, failed refreshes or stale data; saved status text in the menu is then labeled **Last known**. Missing fields do not imply that climate is on or the car is unlocked. Icons reflect the last successful poll, not a push connection to the car.
 - Range is never estimated from battery percentage. API miles are converted to kilometers only when required by the vehicle's units.
 - Range/percentage selection is local. Automatic synchronization with the Tesla mobile app's display preference is not implemented.
 - Smooth green pulsing is not implemented; charging uses a static green label and lightning icon.
@@ -148,7 +155,7 @@ git pull --ff-only
 python3 -m scripts.install
 ```
 
-For Python-only updates with unchanged helpers, use `python3 -m scripts.install --runtime-only`. Change intervals through xBar's plugin management so the running app picks up the new filename.
+For runtime and icon updates with unchanged helpers, use `python3 -m scripts.install --runtime-only`. Change intervals through xBar's plugin management so the running app picks up the new filename.
 
 ## Development
 

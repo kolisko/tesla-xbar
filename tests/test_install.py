@@ -18,6 +18,8 @@ class InstallTests(unittest.TestCase):
             path.mkdir()
         (self.source / "src").mkdir()
         (self.source / "src" / "tesla_xbar.py").write_text("# generic code\n")
+        (self.source / "src" / "icons").mkdir()
+        (self.source / "src" / "icons" / "fan.png").write_bytes(b"example icon")
         for name in ("tesla-control", "tesla-keychain"):
             (self.target / name).write_bytes(b"existing helper")
 
@@ -26,6 +28,7 @@ class InstallTests(unittest.TestCase):
         private = self.target / "command-key.pem"
         self.assertEqual(private.stat().st_mode & 0o777, 0o600)
         self.assertEqual((self.target / "public-key.pem").stat().st_mode & 0o777, 0o600)
+
         self.assertIn(b"PUBLIC KEY", (self.target / "public-key.pem").read_bytes())
         self.assertEqual(list(self.source.glob("*.pem")), [])
         other = self.root / "other-profile"
@@ -50,6 +53,9 @@ class InstallTests(unittest.TestCase):
         self.assertEqual((self.target / "tesla_xbar.py").read_bytes(), (self.source / "src" / "tesla_xbar.py").read_bytes())
         self.assertEqual(self.target.stat().st_mode & 0o777, 0o700)
         self.assertEqual((self.target / "public-key.pem").stat().st_mode & 0o777, 0o600)
+        self.assertEqual((self.target / "icons" / "fan.png").read_bytes(), b"example icon")
+        self.assertEqual((self.target / "icons").stat().st_mode & 0o777, 0o700)
+        self.assertEqual((self.target / "icons" / "fan.png").stat().st_mode & 0o777, 0o600)
 
     def test_missing_existing_key_is_not_silently_regenerated(self):
         (self.target / "config.json").write_text("{}")
@@ -68,6 +74,8 @@ class InstallTests(unittest.TestCase):
         self.assertIn("Settings… | shell=", result.stdout)
         self.assertEqual((self.target / "tesla_xbar.py").read_bytes(),
                          (source / "src" / "tesla_xbar.py").read_bytes())
+        for icon in (source / "src" / "icons").glob("*.png"):
+            self.assertEqual((self.target / "icons" / icon.name).read_bytes(), icon.read_bytes())
 
     def test_installer_module_help(self):
         result = subprocess.run([sys.executable, "-B", "-m", "scripts.install", "--help"],

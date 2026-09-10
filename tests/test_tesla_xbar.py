@@ -80,7 +80,7 @@ class Tests(unittest.TestCase):
         client = FakeClient()
         result = app.fetch_state(self.config, client=client)
         self.assertEqual(len(client.calls), 2)
-        self.assertTrue(client.calls[1].endswith("?endpoints=charge_state%3Bgui_settings"))
+        self.assertTrue(client.calls[1].endswith("?endpoints=charge_state%3Bgui_settings%3Bclimate_state%3Bvehicle_state"))
         self.assertEqual(result["charge"]["battery_level"], 72)
         self.assertEqual(result["gui_settings"], {"gui_distance_units": "km/hr", "gui_range_display": "Rated"})
         self.assertNotIn("latitude", json.dumps(result))
