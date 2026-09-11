@@ -57,7 +57,11 @@ def build_helpers(source):
     location = build / "tesla-location"
     subprocess.run(["/usr/bin/swiftc", "-module-cache-path", str(build / "module-cache"),
                     str(source / "src" / "location.swift"), "-o", str(location)], check=True)
-    return {"tesla-keychain": binary, "tesla-location": location, "tesla-control": build_commands()}
+    map_image = build / "tesla-map-image"
+    subprocess.run(["/usr/bin/swiftc", "-module-cache-path", str(build / "module-cache"),
+                    str(source / "src" / "map_image.swift"), "-o", str(map_image)], check=True)
+    return {"tesla-keychain": binary, "tesla-location": location, "tesla-map-image": map_image,
+            "tesla-control": build_commands()}
 
 
 def install(source, target, plugins, *, runtime_only=False, python=None):
@@ -66,7 +70,7 @@ def install(source, target, plugins, *, runtime_only=False, python=None):
         raise RuntimeError("Multiple active Tesla plugins found. Keep only one in xBar and run the installer again.")
     plugin = active[0] if active else plugins / "tesla-battery.1m.sh"
     helpers = {} if runtime_only else build_helpers(source)
-    if runtime_only and not all((target / name).is_file() for name in ("tesla-keychain", "tesla-control", "tesla-location")):
+    if runtime_only and not all((target / name).is_file() for name in ("tesla-keychain", "tesla-control", "tesla-location", "tesla-map-image")):
         raise RuntimeError("Helpers are missing. Run the installer without --runtime-only first.")
     target.mkdir(parents=True, exist_ok=True, mode=0o700)
     plugins.mkdir(parents=True, exist_ok=True)

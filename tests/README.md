@@ -22,6 +22,8 @@ To run only installer tests, use `python3 -B -m unittest tests.test_install`. Th
 
 These automated tests do not replace testing menu interactions in the real xBar application. See the [contribution guide](../.github/CONTRIBUTING.md).
 
+`test_location_map.py` covers explicit map opt-in, reuse while asleep, vehicle/position binding, map failures, corrupt images, provider Retry-After, disabling and transport bounds. Tests use generated PNG fixtures and fake services; they never send a vehicle position to a map provider.
+
 `python3 -m scripts.build_commands` also runs the Go adapter tests from
 [`src/commands/climate_test.go`](../src/commands/climate_test.go) in the pinned SDK
 package using the build overlay. They never connect to a vehicle.

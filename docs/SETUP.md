@@ -114,7 +114,7 @@ Both paths preserve configuration, keys, tokens, saved readings and the active w
 
 ## Troubleshooting
 
-- **Offline / asleep:** the last known reading remains visible. A last known connected cable keeps the text green; otherwise it is gray. The original timestamp and **Last known cable state** remain in the menu. Use the explicit wake action only when you want to wake the car.
+- **Offline / asleep:** the last known reading remains visible. A small trailing dot marks offline/asleep (for example, `360 km ·`). A last known connected cable keeps the text green; unplugged readings keep their usual range color. The original timestamp and **Last known cable state** remain in the menu. Use the explicit wake action only when you want to wake the car.
 - **No data yet:** confirm registration, region, consent and the vehicle's connectivity.
 - **Missing key:** pair your own app key in the Tesla mobile app. Do not create a new key to fix an existing profile unless you also update the hosted public key and vehicle pairing.
 - **Expired login:** reconnect the account. Tokens normally refresh automatically.
@@ -134,9 +134,14 @@ Do not paste tokens, callback URLs, VINs or private profile files into GitHub is
 2. In xBar, choose **Location → Enable Location…**.
 3. On Tesla’s consent page, allow **Vehicle Location**. Existing battery and command permissions remain requested.
 4. Refresh the plugin while the vehicle is online. The Location submenu shows the address and **Open in Apple Maps**. It does not automatically wake the car.
+5. Optionally choose **Location → Enable map preview**. This shares map bounds centered on the vehicle with MapMap, a separate provider. No map API key, account, Documents permission or Mac GPS access is required. The map appears above the address with a blue dot and no POI pins.
 
 Enabling Location shares the vehicle’s latitude/longitude with Apple’s geocoding service to obtain an address. It does not read your Mac’s location or send Apple your Tesla credentials or VIN. Address lookup runs only when needed and is bounded to eight seconds; no daemon is installed. Existing coordinates reuse their matching address. Changed coordinates never inherit the old address.
 
 Offline/asleep vehicles retain the last known position and its original time. If Apple has no address or lookup fails, the map still opens the coordinate. An address may lack a house number or describe the nearest street; it cannot identify an exact parking space. Tesla may show its location-sharing indicator in the vehicle.
 
 **Disable Location** clears the saved location/address and rendered map link and stops requesting GPS data. It does not revoke Tesla’s server-side permission; use Tesla account permissions to revoke that separately.
+
+The map preview uses `location_map_enabled` (default `false`) and the `tesla-map-image` helper. Run the full installer when upgrading to this feature. A changed saved position causes at most one MapMap request during the normal plugin refresh; the same position reuses its cached image. No extra Tesla request or wake is sent. If map retrieval fails after movement, the previous map is hidden rather than presented as the new position; the Apple Maps link remains. The map uses the location timestamp already shown in the submenu, including while the vehicle sleeps.
+
+**Hide map preview** deletes `location-map.png` and stops map requests, while retaining the address and Apple Maps link. **Disable Location** also deletes the map. Map images and menu snapshots are private location data; never attach them to a public issue.

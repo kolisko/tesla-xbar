@@ -19,6 +19,7 @@ build/
 /.codex/
 config.json
 cache.json
+location-map.png
 command-result.json
 command-setup.json
 command-sessions.json

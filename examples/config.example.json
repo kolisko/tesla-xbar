@@ -4,5 +4,6 @@
   "domain": "your-app.example.com",
   "redirect_uri": "http://localhost:8765/callback",
   "display_mode": "range",
-  "location_enabled": false
+  "location_enabled": false,
+  "location_map_enabled": false
 }
