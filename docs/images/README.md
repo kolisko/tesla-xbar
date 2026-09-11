@@ -4,10 +4,11 @@ These illustrations show the plugin's appearance using fictional data and a neut
 
 | Files | Preview |
 | --- | --- |
-| [`menu-bar.svg`](menu-bar.svg), [`menu-bar.png`](menu-bar.png) | Green range label with a charging symbol. |
+| [`menu-bar.svg`](menu-bar.svg), [`menu-bar.png`](menu-bar.png) | Monochrome charging bolt before the green range label. |
 | [`menu.svg`](menu.svg), [`menu.png`](menu.png) | Expanded menu with battery readings, charging controls and settings. |
 | [`states.svg`](states.svg), [`states.png`](states.png) | Eight examples: charging, connected, low range, and asleep/offline with either a last known connected cable (green) or unplugged cable (gray). Unavailable readings have no status icon. |
-| [`status-icons.svg`](status-icons.svg), [`status-icons.png`](status-icons.png) | Camp Mode, Pet Mode, climate fan and open padlock icons, plus a combined menu-bar example. |
+| [`status-icons.svg`](status-icons.svg), [`status-icons.png`](status-icons.png) | Matching charging, Camp Mode, Pet Mode, climate fan and open padlock icons, plus a combined menu-bar example. |
+| [`clima.svg`](clima.svg), [`clima.png`](clima.png) | Clima controls for modes, temperature and shutdown. |
 
 [`scripts/render_status_icons.cjs`](../../scripts/render_status_icons.cjs) generates
 the status-icons preview together with the runtime PNG assets. Its optional

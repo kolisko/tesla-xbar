@@ -1,5 +1,6 @@
 import base64
 import json
+import itertools
 from pathlib import Path
 import struct
 import tempfile
@@ -30,7 +31,7 @@ class StatusIconTests(unittest.TestCase):
         self.home = patch.object(app, "APP_DIR", Path(directory.name))
         self.home.start()
         self.addCleanup(self.home.stop)
-        self.now = time.time()
+        self.now = float(int(time.time()))
         self.config = app.DEFAULTS | {"client_id": "example", "vin": "EXAMPLEVIN"}
 
     def cache(self, mode="camp", climate=True, locked=False):
@@ -43,16 +44,16 @@ class StatusIconTests(unittest.TestCase):
     def test_status_fields_share_battery_request_and_filter_private_response(self):
         client = StatusClient({
             "climate_state": {"climate_keeper_mode": "camp", "is_climate_on": True,
-                              "timestamp": (self.now - 5) * 1000, "inside_temp": 22},
+                              "timestamp": (self.now - 5) * 1000, "fan_speed": 3},
             "vehicle_state": {"locked": False, "timestamp": (self.now - 10) * 1000,
                               "odometer": 1000, "vehicle_name": "Private name"}})
         cache = app.fetch_state(self.config, client=client)
         self.assertEqual(len(client.calls), 2)
         self.assertEqual(cache["climate"], {"climate_keeper_mode": "camp", "is_climate_on": True, "updated_at": self.now - 5})
         self.assertEqual(cache["vehicle_status"], {"locked": False, "updated_at": self.now - 10})
-        for excluded in ("inside_temp", "odometer", "vehicle_name", "latitude"):
+        for excluded in ("fan_speed", "odometer", "vehicle_name", "latitude"):
             self.assertNotIn(excluded, json.dumps(cache))
-        self.assertEqual(app.active_status_icons(cache), ["camp", "fan", "unlocked"])
+        self.assertEqual(app.active_status_icons(cache), ["charging", "camp", "fan", "unlocked"])
 
     def test_modes_and_boolean_fields_have_independent_indicators(self):
         for mode, expected in (("camp", ["camp"]), ("dog", ["pet"]), ("pet", ["pet"]),
@@ -101,7 +102,7 @@ class StatusIconTests(unittest.TestCase):
             with self.subTest(sections=sections):
                 app.save_json("cache.json", self.cache() | {"vin": "EXAMPLEVIN"})
                 cache = app.fetch_state(self.config, client=StatusClient(sections))
-                self.assertEqual(app.active_status_icons(cache), [])
+                self.assertEqual(app.active_status_icons(cache), ["charging"])
                 self.assertNotIn("climate_keeper_mode", cache["climate"])
                 self.assertNotIn("locked", cache["vehicle_status"])
 
@@ -110,7 +111,7 @@ class StatusIconTests(unittest.TestCase):
         cache = app.fetch_state(self.config, client=StatusClient({
             "climate_state": {"climate_keeper_mode": "off", "is_climate_on": False},
             "vehicle_state": {"locked": True}}))
-        self.assertEqual(app.active_status_icons(cache), [])
+        self.assertEqual(app.active_status_icons(cache), ["charging"])
         self.assertIn("Climate: off", app.status_menu_lines(cache))
         self.assertIn("Vehicle: locked", app.status_menu_lines(cache))
 
@@ -131,14 +132,18 @@ class StatusIconTests(unittest.TestCase):
         self.assertIn("Climate mode: Camp Mode", app.render(cache, self.config))
         self.assertTrue(app.render(cache, self.config | {"display_mode": "percent"}).startswith("73% |"))
         cache["charge"]["charging_state"] = "Charging"
-        self.assertTrue(app.render(cache, self.config).startswith("360 km ⚡ |"))
+        title = app.render(cache, self.config).splitlines()[0]
+        self.assertTrue(title.startswith("360 km | color=#32CD66 templateImage="))
+        self.assertNotIn("⚡", title)
+        self.assertEqual(base64.b64decode(title.split("templateImage=")[1]),
+                         (app.HERE / "icons" / "charging-camp-fan-unlocked.png").read_bytes())
 
     def test_all_valid_combinations_are_retina_pngs_at_menu_bar_size(self):
         combinations = []
-        for mode in (None, "camp", "pet"):
+        for charging, mode in itertools.product((False, True), (None, "camp", "pet")):
             for fan in (False, True):
                 for unlocked in (False, True):
-                    names = [name for name in (mode, "fan" if fan else None, "unlocked" if unlocked else None) if name]
+                    names = [name for name in ("charging" if charging else None, mode, "fan" if fan else None, "unlocked" if unlocked else None) if name]
                     if not names:
                         continue
                     combinations.append(names)
@@ -153,7 +158,7 @@ class StatusIconTests(unittest.TestCase):
                             chunks[png[offset + 4:offset + 8]] = png[offset + 8:offset + 8 + length]
                             offset += length + 12
                         self.assertEqual(struct.unpack(">IIB", chunks[b"pHYs"]), (5669, 5669, 1))
-        self.assertEqual(len(combinations), 11)
+        self.assertEqual(len(combinations), 23)
         self.assertEqual(app.status_icon_image(["camp", "pet"]), "")
 
     def test_missing_asset_keeps_textual_status_available(self):

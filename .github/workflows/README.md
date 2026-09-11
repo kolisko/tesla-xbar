@@ -9,4 +9,8 @@ Both workflows run for pull requests and pushes to `main`, with additional sched
 
 Commands execute from the repository root. Application sources are in [`src/`](../../src/README.md), tools in [`scripts/`](../../scripts/README.md), and tests in [`tests/`](../../tests/README.md). Build output goes into the ignored `build/` directory.
 
+The helper build runs the climate adapter's Go tests. The Go vulnerability audit
+uses a temporary SDK copy with the same adapter materialized as ordinary files,
+so its source parser analyzes the complete CLI package built for installation.
+
 The [security policy](../SECURITY.md) describes the checks and Swift analysis timing. Workflows use fake accounts and must not receive real Tesla credentials.

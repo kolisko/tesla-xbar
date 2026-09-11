@@ -21,7 +21,7 @@ class CommandClient(WakeClient):
 
     def command_capabilities(self, vin):
         return {"vin": vin, "key_paired": self.paired, "signing_required": True,
-                "charging_authorized": self.authorized}
+                "charging_authorized": self.authorized, "vehicle_authorized": self.authorized}
 
     def vehicle_command(self, vin, command, capabilities):
         self.commands.append((vin, command))
@@ -149,7 +149,7 @@ class CommandsTests(unittest.TestCase):
         client = app.Client(self.config, Vault({"access_token": "header." + payload + ".sig", "expires_at": time.time() + 3600}))
         response = {"response": {"key_paired_vins": ["EXAMPLEVIN"], "vehicle_info": {"EXAMPLEVIN": {"vehicle_command_protocol_required": True}}}}
         with patch.object(client, "request", return_value=response):
-            self.assertEqual(client.command_capabilities("EXAMPLEVIN"), {"vin": "EXAMPLEVIN", "signing_required": True, "key_paired": True, "charging_authorized": True})
+            self.assertEqual(client.command_capabilities("EXAMPLEVIN"), {"vin": "EXAMPLEVIN", "signing_required": True, "key_paired": True, "charging_authorized": True, "vehicle_authorized": False})
 
 
 if __name__ == "__main__":

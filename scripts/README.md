@@ -5,12 +5,18 @@ Run these commands from the repository root.
 | File | Purpose | Command |
 | --- | --- | --- |
 | [`install.py`](install.py) | Build helpers, install the application and generate shell launchers while preserving an existing private profile and refresh interval. | `python3 -m scripts.install` |
-| [`build_commands.py`](build_commands.py) | Download and build the pinned revision of Tesla's official Go command tool into `build/`. | `python3 -m scripts.build_commands` |
+| [`build_commands.py`](build_commands.py) | Download the pinned Tesla SDK, test the local climate-keeper adapter and build the command helper using a Go overlay. The SDK checkout remains unchanged. | `python3 -m scripts.build_commands` |
+| [`audit_commands.py`](audit_commands.py) | Materialize the SDK and adapter in a temporary copy and run the pinned Go dependency audit. Run after building the helper. | `python3 -m scripts.audit_commands` |
 | [`check_public_files.py`](check_public_files.py) | Scan Git-tracked files for private profile data, personal identifiers and image metadata. | `python3 scripts/check_public_files.py` |
 | [`render_previews.py`](render_previews.py) | Generate SVG documentation illustrations using fictional vehicle data. | `python3 scripts/render_previews.py` |
 | [`render_status_icons.cjs`](render_status_icons.cjs) | Generate Retina PNG status icons and their fictional documentation preview from the SVG sources in `src/icons/`. Development only; requires Node.js and `sharp`. | `node scripts/render_status_icons.cjs` |
 
 For runtime and icon updates with unchanged helpers, use `python3 -m scripts.install --runtime-only`. The installer and command builder run as Python modules; `__init__.py` provides their package. Use `python3 -m scripts.install --help` for installer options.
+
+The Clima controls update requires a full install to rebuild `tesla-control` with
+the adapter. `build/command-overlay.json` is generated locally for builds and adapter
+tests; it contains local paths and must remain untracked. The audit tool creates
+and removes a temporary source copy because govulncheck reads physical files.
 
 To regenerate status icons without adding runtime dependencies, install the optional
 renderer in the ignored build directory:

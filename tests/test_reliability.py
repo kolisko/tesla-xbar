@@ -46,7 +46,8 @@ class ReliabilityTests(unittest.TestCase):
         for state in ("asleep", "offline"):
             self.assertEqual(app.render({"state": state}, self.config).splitlines()[0],
                              "— | color=#A0A6AD")
-        self.assertIn("⚡", app.render(baseline, self.config).splitlines()[0])
+        self.assertEqual(app.active_status_icons(baseline), ["charging"])
+        self.assertIn("templateImage=", app.render(baseline, self.config).splitlines()[0])
 
     def test_408_is_unavailable_and_only_successful_list_verifies_vehicle(self):
         baseline = self.seed()
@@ -111,9 +112,9 @@ class ReliabilityTests(unittest.TestCase):
                         cached_color = "#A0A6AD" if charging_state == "Disconnected" else "#32CD66"
                         self.assertEqual(app.render(cache | changes, self.config).splitlines()[0],
                                          f"161 km | color={cached_color}")
-                suffix = " ⚡" if charging_state == "Charging" else ""
-                self.assertEqual(app.render(cache, self.config).splitlines()[0],
-                                 f"161 km{suffix} | color={color}")
+                top = app.render(cache, self.config).splitlines()[0]
+                self.assertEqual(top.split(" templateImage=")[0], f"161 km | color={color}")
+                self.assertEqual("templateImage=" in top, charging_state == "Charging")
 
     def test_fresh_disconnect_replaces_saved_connected_green(self):
         self.seed()

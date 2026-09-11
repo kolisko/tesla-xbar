@@ -182,11 +182,11 @@ class Tests(unittest.TestCase):
     def test_missing_range_or_units_does_not_substitute_percent_or_estimate(self):
         cache = app.fetch_state(self.config, client=FakeClient())
         cache["charge"].pop("battery_range")
-        self.assertEqual(app.render(cache, self.config).splitlines()[0].split(" |")[0], "— ⚡")
+        self.assertEqual(app.render(cache, self.config).splitlines()[0].split(" |")[0], "—")
         cache["charge"]["battery_range"] = 0
         self.assertTrue(app.render(cache, self.config).startswith("0 km"))
         cache["gui_settings"].pop("gui_distance_units")
-        self.assertEqual(app.render(cache, self.config).splitlines()[0].split(" |")[0], "— ⚡")
+        self.assertEqual(app.render(cache, self.config).splitlines()[0].split(" |")[0], "—")
 
     def test_sleep_keeps_range_and_preferences(self):
         app.fetch_state(self.config, client=FakeClient())
