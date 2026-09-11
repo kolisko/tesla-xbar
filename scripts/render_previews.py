@@ -1,6 +1,7 @@
 """Create documentation mockups with fictional data, without reading a Tesla profile."""
 from pathlib import Path
 from html import escape
+import base64
 
 OUT = Path(__file__).resolve().parents[1] / "docs/images"
 OUT.mkdir(parents=True, exist_ok=True)
@@ -84,20 +85,24 @@ body += text(28, 563, 'Turn modes off', 24)
 body += text(28, 610, 'Turn climate and modes off', 24)
 body += text(28, 667, 'Illustrative data · Temperature sets both front zones', 17, '#a0a6ad')
 (OUT / 'clima.svg').write_text(svg(600, 702, body))
-body = '<rect width="1080" height="445" rx="20" fill="#111c29"/>'
-body += '<rect x="16" y="16" width="430" height="413" rx="16" fill="#202932"/>'
-body += '<rect x="464" y="16" width="600" height="413" rx="16" fill="#202932"/>'
+body = '<rect width="1080" height="900" rx="20" fill="#111c29"/>'
+body += '<rect x="16" y="16" width="430" height="868" rx="16" fill="#202932"/>'
+body += '<rect x="464" y="16" width="600" height="868" rx="16" fill="#202932"/>'
 body += text(40, 62, 'Sentry', 26, weight=600)
 body += text(40, 112, 'Sentry: on', 22, '#a0a6ad')
 body += text(40, 174, '✓ Turn Sentry on', 24)
 body += text(40, 225, 'Turn Sentry off', 24)
 body += text(488, 62, 'Location', 26, weight=600)
-for y, label in [(109, 'Address'), (147, 'Example Street 1'), (182, 'Example City'),
-                 (221, 'Location reading from 12 Jul 09:41')]:
+map_png = base64.b64encode((OUT / 'location-map-example.png').read_bytes()).decode()
+body += f'<image x="488" y="86" width="552" height="368" href="data:image/png;base64,{map_png}"/>'
+for y, label in [(495, 'Address'), (533, 'Times Square'), (568, 'New York, NY'),
+                 (610, 'Location reading from 12 Jul 09:41')]:
     body += text(488, y, label, 22, '#a0a6ad')
-body += text(488, 278, 'Open in Apple Maps', 24)
-body += text(488, 329, 'Connect Tesla account…', 24)
-body += text(488, 380, 'Disable Location', 24)
-body += text(40, 397, 'Illustrative data', 18, '#a0a6ad')
-(OUT / 'sentry-location.svg').write_text(svg(1080, 445, body))
+body += text(488, 671, 'Open in Apple Maps', 24)
+body += text(488, 722, 'Hide map preview', 24)
+body += text(488, 773, 'Connect Tesla account…', 24)
+body += text(488, 824, 'Disable Location', 24)
+body += text(40, 797, 'Public landmark example', 18, '#a0a6ad')
+body += text(40, 833, 'No personal location data', 18, '#a0a6ad')
+(OUT / 'sentry-location.svg').write_text(svg(1080, 900, body))
 print('Created five SVG previews using fictional data only.')

@@ -16,4 +16,4 @@ development dependencies are described in the [scripts guide](../../scripts/READ
 
 [`scripts/render_previews.py`](../../scripts/render_previews.py) generates the SVG sources. The PNG versions are rendered from those SVGs for reliable display in the [main README](../../README.md#see-it-in-action). If changing an illustration, update both formats and check the rendered result. Keep PNGs free of personal information and embedded metadata; the public-file scan checks tracked PNGs for text and EXIF metadata.
 
-`sentry-location.svg` / `.png` illustrate the Sentry and Location submenus with fictional labels and an illustrative address. The previews contain no user location or map screenshot.
+`sentry-location.svg` / `.png` illustrate the Sentry and Location submenus. `location-map-example.png` is a real MapMap rendering of the public Times Square landmark (40.758, -73.9855), with POIs disabled and a locally drawn blue dot. It is a documentation example, not a user location or personal screenshot. Preserve its provider attribution. The menu illustration uses an example timestamp and the public landmark name.

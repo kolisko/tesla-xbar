@@ -24,9 +24,9 @@ Open **Clima** to see inside and outside temperatures, change climate modes, tur
 
 <img src="docs/images/clima.png" alt="Clima submenu with Keep, Camp and Pet modes, temperature selection and full shutdown" width="420">
 
-Open **Sentry** for on/off controls and **Location** for the address and map link.
+Open **Sentry** for on/off controls and **Location** for the address, optional map preview and Apple Maps link.
 
-<img src="docs/images/sentry-location.png" alt="Sentry on/off submenu and Location submenu with an illustrative address, timestamp and Apple Maps link" width="960">
+<img src="docs/images/sentry-location.png" alt="Sentry controls and Location with a MapMap preview, blue vehicle dot, example Times Square address, timestamp and Apple Maps link" width="960">
 
 ## Features
 
@@ -39,7 +39,7 @@ Open **Sentry** for on/off controls and **Location** for the address and map lin
 - **Explicit commands:** wake and refresh, start/stop charging, open/close the charge port, and climate controls. Normal refresh never sends a wake or climate command.
 - **Clima submenu:** normal climate, Keep Climate On, Camp Mode, Pet Mode, temperature selection in 0.5 °C steps, modes off, and full climate/modes off. Temperature choices use the limits reported by the vehicle and set both front zones; changing the target alone does not turn climate on. Normal climate and full shutdown exit an active keeper mode first. Clicked actions can wake an unavailable vehicle before sending the command.
 - **Sentry submenu:** turn Sentry on or off using the existing Vehicle Commands permission. The active icon uses the same size, monochrome tint and placement as the other indicators.
-- **Location submenu (optional):** the vehicle’s reported address, reading time and a link that opens its position in Apple Maps. Requires Vehicle Location consent. Offline data is explicitly labeled as last known.
+- **Location submenu (optional):** address, reading time, a MapMap preview with a blue vehicle dot and no POI pins, and an Apple Maps link. Requires Vehicle Location consent; map sharing is separately enabled and needs no map API key. Offline data is explicitly labeled as last known.
 - **Private profiles:** tokens and Client Secret in Keychain; configuration, signing key and cached readings in the current user's Application Support directory.
 - **Updates preserve your setup:** existing keys, credentials, readings and xBar interval remain intact.
 
@@ -60,6 +60,8 @@ flowchart TD
     C -->|Signed vehicle commands| F
     P -->|Optional coordinates over stdin| G["tesla-location: Swift geocoder"]
     G --> A["Apple map services: postal address"]
+    P -->|Optional map viewport, no credentials| M["MapMap: static map image"]
+    P --> I["tesla-map-image: local blue dot and Retina PNG"]
 ```
 
 | Component | Responsibility |
@@ -70,6 +72,7 @@ flowchart TD
 | [`icons/`](src/icons/README.md) | Prebuilt monochrome image strips for climate modes, running climate and an unlocked vehicle. Python includes the matching PNG in xBar's output; macOS supplies its tint. No runtime image renderer is needed. |
 | `tesla-keychain`, built from [`keychain.swift`](src/keychain.swift) | Small Swift executable that accesses macOS Keychain. Secrets are passed to it through stdin. |
 | `tesla-location`, built from [`location.swift`](src/location.swift) | Short-lived Swift helper using Apple’s reverse-geocoding service. Receives only vehicle coordinates over stdin and returns a postal address. It never requests the Mac’s location. |
+| `tesla-map-image`, built from [`map_image.swift`](src/map_image.swift) | Local AppKit renderer. Receives map image bytes over stdin, adds a blue dot with a white outline and emits a Retina PNG. No network, GPS or Keychain access. |
 | `tesla-control`, built by [`build_commands.py`](scripts/build_commands.py) | Tesla's Go command tool, built from a pinned revision with a small [climate-keeper CLI adapter](src/commands/README.md). Python invokes it for commands requiring vehicle signatures. The SDK checkout remains unchanged. |
 | [`install.py`](scripts/install.py) | Builds the helpers, installs the runtime and launchers, and creates a signing key for a new profile. Updates reuse the existing private profile. |
 
@@ -80,6 +83,8 @@ The same `vehicle_data` request includes `charge_state`, `gui_settings`, `climat
 When Location is enabled and authorized, the same request also includes `location_data`; the coordinates arrive in `drive_state`. Only latitude, longitude, their timestamp and the matching reverse-geocoded address are saved. Missing or denied location access does not block battery or climate data. Address lookup runs only when needed, at most once per minute; it has an eight-second deadline and no background daemon. The Apple Maps link uses coordinates rather than searching by address.
 
 Browser sign-in starts a temporary HTTP listener on the Mac's loopback interface, using the configured callback port. It closes when sign-in completes or times out. Later refreshes renew tokens as needed without opening a browser. The public HTTPS site serves only the **public key**: it does not relay the callback, run the plugin or store credentials.
+
+**Location → Enable map preview** adds a 360 × 240 point map directly to the submenu. At each normal refresh, Python requests a MapMap image only if the saved GPS position changed or its cached image is missing. POIs and provider markers are disabled; `tesla-map-image` draws the blue dot locally. The download has a twenty-second timeout and the renderer a five-second timeout. No extra Tesla request, wake or background worker is needed. The image is bound to the saved position and selected vehicle: an outdated or unavailable image is omitted while the Apple Maps link remains usable. Offline/asleep vehicles retain the last known map and original location timestamp. The provider's Retry-After is honored when present.
 
 ## Repository layout
 
@@ -122,6 +127,7 @@ Choose **Settings…** in the plugin menu to open the interactive Terminal promp
 | Client Secret and account access | **Settings…** saves the secret in Keychain. **Connect Tesla account…** obtains the access and refresh tokens; renewal is automatic while authorization remains valid. |
 | Vehicle | **Select vehicle** appears for multiple vehicles and saves the selected `vin` in `config.json`. |
 | Location | **Location → Enable Location…** sets `location_enabled` to `true` and requests `vehicle_location` consent. This shares vehicle coordinates with Apple to find an address. Default is disabled. **Disable Location** stops collection and clears the saved location/address; revoke the Tesla grant separately if desired. |
+| Map preview | **Location → Enable map preview** sets `location_map_enabled` to `true`. Default is disabled. It shares a viewport centered on the vehicle with MapMap. **Hide map preview** stops map requests and removes the cached map. No MapMap account or API key is needed. |
 | Range or percentage | **Menu bar display** saves `display_mode` as `range` (default) or `percent`. This is a local choice, independent of the Tesla mobile app's display preference. |
 | Refresh interval | Managed by xBar's plugin filename: `tesla-battery.1m.sh` runs every minute; `tesla-battery.5m.sh` runs every five minutes. Change it through xBar's plugin management. There is no separate interval in `config.json`. |
 
@@ -134,6 +140,7 @@ Choose **Settings…** in the plugin menu to open the interactive Terminal promp
 | `command-key.pem` | Private P-256 signing key, generated locally for a new profile. Keep it private and back it up securely. |
 | `public-key.pem` | Matching public key. **Only this key** is copied to your public HTTPS domain's well-known Tesla path. |
 | `cache.json` | Last known vehicle data and reading timestamps. It is generated runtime state, not a file to edit for configuration. |
+| `location-map.png` | Latest map with its vehicle marker. Its identity and checksum are in `cache.json`; both are private. Disabling Location or the map preview deletes the image. |
 | Other runtime files | Command sessions, action results, notices and a rendered display snapshot. These stay in the private profile and must not be included in issues or commits. |
 
 Updates preserve the existing settings, keys and saved readings. Changing the Client ID is a change of Tesla application: the current login is cleared and the app must be registered and connected again. Follow the [setup guide](docs/SETUP.md) for public-key hosting, registration, consent and vehicle-key pairing.
@@ -149,6 +156,8 @@ The public project contains code, tests and demonstration graphics. Private conf
 OAuth tokens and Client Secret use macOS Keychain. Signing keys are generated outside the checkout, and private files use restricted permissions. Each user has their own Tesla registration and keys. No analytics is collected. Location is disabled by default. If enabled, the latest vehicle coordinates and address are kept in the private profile (including the rendered menu snapshot), not a travel history. Coordinates are sent to Apple for address lookup and when opening the map; Tesla tokens, VIN and account details are not sent to Apple. The project maintainer receives none of this data.
 
 The temporary OAuth callback runs only on localhost. Signed command tokens travel through stdin rather than process arguments or temporary files. Physical commands are bound to the vehicle displayed in the menu. Concurrent manual actions are rejected with a visible notice instead of queued.
+
+The map preview is separately opt-in. MapMap receives map bounds centered on the vehicle, so it can infer the position. It receives no Tesla credentials, VIN, account details or address. The PNG and its embedded copy in `display.txt` are private location data and must not be published. They stay in Application Support; no Documents-folder or Mac location permission is needed. Provider attribution is preserved. See [MapMap's static image documentation](https://mapmap.ai/news/static-map-images).
 
 GitHub checks include **CodeQL for Python and Swift, Gitleaks, a privacy scan, Dependabot, unit tests, macOS builds and a Go dependency vulnerability audit**. See [SECURITY.md](.github/SECURITY.md) for the security model and private vulnerability reporting.
 
@@ -176,7 +185,7 @@ python3 -m scripts.install
 
 For runtime and icon updates with unchanged helpers, use `python3 -m scripts.install --runtime-only`. Change intervals through xBar's plugin management so the running app picks up the new filename.
 
-**The Sentry/Location update requires a full installation** (`python3 -m scripts.install`) to build the new Apple geocoding helper. This also builds the climate-keeper adapter. Runtime-only installation requires all helpers to be installed already.
+**The Location map update requires a full installation** (`python3 -m scripts.install`) to build `tesla-map-image`. This also builds the geocoder and climate-keeper adapter. Runtime-only installation requires all helpers to be installed already.
 
 ## Development
 

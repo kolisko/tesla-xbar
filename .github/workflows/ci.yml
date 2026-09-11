@@ -71,6 +71,7 @@ jobs:
           python -m scripts.build_commands
           swiftc src/keychain.swift -o build/tesla-keychain
           swiftc src/location.swift -o build/tesla-location
+          swiftc src/map_image.swift -o build/tesla-map-image
   dependencies:
     name: Go dependency audit
     runs-on: ubuntu-latest

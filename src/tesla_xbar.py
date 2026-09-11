@@ -7,6 +7,7 @@ import datetime as dt
 import email.utils
 import fcntl
 import getpass
+import hashlib
 import html
 import http.server
 import json
@@ -14,6 +15,7 @@ import math
 import os
 from pathlib import Path
 import secrets
+import struct
 import subprocess
 import sys
 import tempfile
@@ -33,6 +35,8 @@ REDIRECT = "http://localhost:8765/callback"
 DEFAULTS = {"region": "eu", "redirect_uri": REDIRECT, "display_mode": "range"}
 STALE_AFTER_SECONDS = 30 * 60
 STATUS_ICON_ORDER = ("charging", "camp", "pet", "fan", "unlocked", "sentry")
+MAP_IMAGE_LIMIT = 3_000_000
+MAP_IMAGE_FILE = "location-map.png"
 VEHICLE_COMMANDS = {
     "charge-start": ("charging-start", "Start charging", "charge_start"),
     "charge-stop": ("charging-stop", "Stop charging", "charge_stop"),
@@ -349,6 +353,8 @@ def fetch_state(config, client=None):
     now = time.time()
     cache.pop("next_poll", None)
     if cache.get("retry_status") == 429 and now < cache.get("retry_at", 0):
+        update_location_map(cache, config)
+        save_json("cache.json", cache)
         return cache
     client = client or Client(config)
     cache.pop("retry_at", None)
@@ -431,6 +437,7 @@ def fetch_state(config, client=None):
             cache["retry_at"] = time.time() + exc.retry_after
         if isinstance(exc, APIError) and exc.status == 408:
             cache["state"] = "offline"  # Unavailable is not proof of sleep.
+    update_location_map(cache, config)
     save_json("cache.json", cache)
     return cache
 
@@ -794,6 +801,105 @@ def update_location(cache, response, now):
     cache.pop("location_error", None)
 
 
+def clear_location_map(cache):
+    cache.pop("location_map", None)
+    (APP_DIR / MAP_IMAGE_FILE).unlink(missing_ok=True)
+
+
+def location_map_request(cache):
+    """Private viewport/identity; never include account data in the map request."""
+    point = coordinates(cache.get("location"))
+    if point is None or not cache.get("vin") or abs(point[0]) > 85.05112878:
+        return None
+    lat, lon = point
+    scale = 256 * 2 ** 17
+    px = (lon + 180) / 360 * scale
+    py = (1 - math.asinh(math.tan(math.radians(lat))) / math.pi) / 2 * scale
+    left, top = px - 360, py - 240
+    longitude = lambda x: x / scale * 360 - 180
+    latitude = lambda y: math.degrees(math.atan(math.sinh(math.pi * (1 - 2 * y / scale))))
+    bbox = [longitude(left), latitude(top + 480), longitude(left + 720), latitude(top)]
+    if bbox[0] < -180 or bbox[2] > 180 or top < 0 or top + 480 > scale:
+        return None  # Keep the coordinate link at projection/dateline edges.
+    # VIN binds the local image to the selected vehicle; it is never sent to MapMap.
+    key = hashlib.sha256(json.dumps([cache["vin"], lat, lon, "mapmap-light-no-poi-v1"]).encode()).hexdigest()
+    query = urllib.parse.urlencode({"bbox": ",".join(map(str, bbox)), "size": "360x240@2x",
+        "pois": "0", "style": "light", "format": "png", "lang": "local"})
+    return key, "https://mapmap.ai/api/static-map?" + query
+
+
+def valid_map_png(data):
+    return (isinstance(data, bytes) and 24 <= len(data) <= MAP_IMAGE_LIMIT
+            and data.startswith(b"\x89PNG\r\n\x1a\n") and data[12:16] == b"IHDR"
+            and struct.unpack(">II", data[16:24]) == (720, 480))
+
+
+def saved_map_png(cache):
+    request = location_map_request(cache)
+    state = cache.get("location_map") or {}
+    if not request or state.get("key") != request[0] or not state.get("sha256"):
+        return None
+    try:
+        with (APP_DIR / MAP_IMAGE_FILE).open("rb") as stream:
+            data = stream.read(MAP_IMAGE_LIMIT + 1)
+        if valid_map_png(data) and hashlib.sha256(data).hexdigest() == state["sha256"]:
+            return data
+    except OSError:
+        pass
+    return None
+
+
+def download_location_map(url):
+    request = urllib.request.Request(url, headers={"Accept": "image/png",
+        "User-Agent": "Tesla-xBar/1.0 (+https://github.com/kolisko/tesla-xbar)"})
+    # A separate, credential-free request. Do not forward the private viewport on redirects.
+    with urllib.request.build_opener(NoRedirect).open(request, timeout=20) as response:
+        raw = response.read(MAP_IMAGE_LIMIT + 1)
+    if not valid_map_png(raw):
+        raise ValueError("Unsupported map image")
+    result = subprocess.run([str(HERE / "tesla-map-image")],
+        input=raw, capture_output=True, timeout=5, umask=0o077)
+    if result.returncode or not valid_map_png(result.stdout):
+        raise ValueError("Map image could not be rendered")
+    return result.stdout
+
+
+def update_location_map(cache, config):
+    """One bounded map request only when the saved vehicle position changes."""
+    if config.get("location_enabled") is not True or config.get("location_map_enabled") is not True:
+        clear_location_map(cache)
+        return
+    request = location_map_request(cache)
+    if request is None:
+        clear_location_map(cache)
+        return
+    if saved_map_png(cache) is not None:
+        return
+    previous = cache.get("location_map") or {}
+    if time.time() < previous.get("retry_at", 0):
+        return  # Honor only the provider's Retry-After, across GPS changes too.
+    state = {"key": request[0]}
+    cache["location_map"] = state
+    try:
+        data = download_location_map(request[1])
+        APP_DIR.mkdir(parents=True, exist_ok=True, mode=0o700)
+        fd, temporary = tempfile.mkstemp(prefix=".map-", dir=APP_DIR)
+        try:
+            with os.fdopen(fd, "wb") as stream:
+                stream.write(data)
+            os.replace(temporary, APP_DIR / MAP_IMAGE_FILE)
+        finally:
+            if os.path.exists(temporary):
+                os.unlink(temporary)
+        state["sha256"] = hashlib.sha256(data).hexdigest()
+    except urllib.error.HTTPError as exc:
+        if exc.code == 429:
+            state["retry_at"] = time.time() + retry_after_seconds(exc.headers.get("Retry-After", ""))
+        state["error"] = "Map preview unavailable. Open the position in Apple Maps."
+    except (OSError, ValueError, subprocess.SubprocessError):
+        state["error"] = "Map preview unavailable. Open the position in Apple Maps."
+
+
 def location_menu(cache, config):
     lines = ["Location"]
     if config.get("location_enabled") is not True:
@@ -805,6 +911,12 @@ def location_menu(cache, config):
     point = coordinates(location)
     current = status_is_current(cache, "location") and not cache.get("location_error")
     if point is not None:
+        if config.get("location_map_enabled") is True:
+            png = saved_map_png(cache)
+            if png is not None:
+                lines.append("--\u200b | image=" + base64.b64encode(png).decode())
+            else:
+                lines.append("--Map preview unavailable • use Open in Apple Maps | color=gray")
         label = "Address" if current else "Last known address"
         address = location.get("address")
         if isinstance(address, str) and address:
@@ -823,6 +935,11 @@ def location_menu(cache, config):
         lines.append("--Location is not available yet | color=gray")
     if cache.get("location_error"):
         lines.append("--" + safe_text(cache["location_error"]) + " | color=gray")
+    if config.get("location_map_enabled") is True:
+        lines.append("--" + action("Hide map preview", "map-disable"))
+    else:
+        lines.extend(["--Map preview shares the map area with MapMap | color=gray",
+                      "--" + action("Enable map preview", "map-enable")])
     lines.extend(["-----", "--" + action("Connect Tesla account…", "authorize", terminal=True),
                   "--" + action("Disable Location", "location-disable")])
     return lines
@@ -1224,7 +1341,7 @@ def authorize(config, launch=True):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("command", nargs="?", default="menu", choices=["menu", "refresh", "wake-refresh", "command", "command-setup", "configure", "provision", "register", "authorize", "location-enable", "location-disable", "select", "display", "demo"])
+    parser.add_argument("command", nargs="?", default="menu", choices=["menu", "refresh", "wake-refresh", "command", "command-setup", "configure", "provision", "register", "authorize", "location-enable", "location-disable", "map-enable", "map-disable", "select", "display", "demo"])
     parser.add_argument("value", nargs="?")
     parser.add_argument("--vin", help="Vehicle bound to the clicked menu item")
     parser.add_argument("--temperature", help="Target Celsius temperature for climate-set-temp")
@@ -1248,11 +1365,23 @@ def main():
                     cache = read_json("cache.json")
                     cache.pop("location", None)
                     cache.pop("location_error", None)
+                    clear_location_map(cache)
                     save_json("cache.json", cache)
                     publish_display(cache, config, render(cache, config))
             if config["location_enabled"]:
                 print("Location uses Tesla GPS data. Address lookup shares those coordinates with Apple.")
                 authorize(config, launch=not args.no_browser)
+        elif args.command in ("map-enable", "map-disable"):
+            with locked(blocking=False):
+                config = configuration()
+                config["location_map_enabled"] = args.command == "map-enable"
+                save_json("config.json", config)
+                cache = read_json("cache.json")
+                update_location_map(cache, config)
+                save_json("cache.json", cache)
+                menu = render(cache, config)
+                publish_display(cache, config, menu)
+                print(menu)
         elif args.command == "register":
             with locked():
                 register(config)

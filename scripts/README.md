@@ -13,6 +13,8 @@ Run these commands from the repository root.
 
 For runtime and icon updates with unchanged helpers, use `python3 -m scripts.install --runtime-only`. The installer and command builder run as Python modules; `__init__.py` provides their package. Use `python3 -m scripts.install --help` for installer options.
 
+The Location map update needs a full installation to compile `src/map_image.swift` as `tesla-map-image`. The installed helper uses AppKit; no Python imaging library, Node.js runtime or map API key is needed.
+
 The Clima controls update requires a full install to rebuild `tesla-control` with
 the adapter. `build/command-overlay.json` is generated locally for builds and adapter
 tests; it contains local paths and must remain untracked. The audit tool creates
