@@ -381,6 +381,10 @@ def fetch_state(config, client=None):
         if location_enabled and not location_allowed:
             cache.pop("location", None)
             cache["location_error"] = "Allow Vehicle Location via Connect Tesla account."
+        elif location_allowed:
+            # Consent can be renewed while the car is offline. Do not keep an
+            # obsolete permission/lookup error until its next live GPS reading.
+            cache.pop("location_error", None)
         if cache["state"] == "online":
             path = "/api/1/vehicles/" + urllib.parse.quote(selected["vin"], safe="") + "/vehicle_data?endpoints=charge_state%3Bgui_settings%3Bclimate_state%3Bvehicle_state"
             try:

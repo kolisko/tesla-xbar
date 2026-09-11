@@ -155,6 +155,19 @@ class FeatureTests(unittest.TestCase):
         self.assertIn("Open last known position", app.render(cache, config))
         self.assertEqual(client.wakes, [])
 
+    def test_new_consent_clears_old_error_while_vehicle_is_offline(self):
+        config = self.config | {"location_enabled": True}
+        client = FeatureClient(state="offline")
+        client.location_allowed = False
+        cache = app.fetch_state(config, client)
+        self.assertIn("Vehicle Location", cache["location_error"])
+        client.location_allowed = True
+        cache = app.fetch_state(config, client)
+        self.assertNotIn("location_error", cache)
+        self.assertNotIn("location", cache)
+        self.assertIn("Location is not available yet", app.render(cache, config))
+        self.assertEqual(client.wakes, [])
+
     def test_moved_missing_or_old_location_never_shows_wrong_address(self):
         now = time.time()
         cache = {}
