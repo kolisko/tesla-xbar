@@ -46,7 +46,7 @@ Create your application in the [Tesla Developer portal](https://developer.tesla.
 | Grant types | Authorization Code and Client Credentials / Machine-to-Machine |
 | Vehicle access | Vehicle Information, Vehicle Commands, Vehicle Charging Management |
 
-The plugin requests `openid offline_access vehicle_device_data vehicle_cmds vehicle_charging_cmds`. The current version requests command scopes as well as read access because it includes wake and charging controls. It does not request vehicle location or energy-product scopes. Tesla's charging scope may cover more information than this plugin uses; inspect Tesla's consent page before granting access.
+The plugin requests `openid offline_access vehicle_device_data vehicle_cmds vehicle_charging_cmds`. The current version requests command scopes as well as read access because it includes wake and charging controls. Location is optional: enable **Vehicle Location** for the developer app, then choose **Location → Enable Location…** and approve that scope on Tesla’s consent page. This adds `vehicle_location`. No energy-product scopes are requested. Tesla's charging scope may cover more information than this plugin uses; inspect Tesla's consent page before granting access.
 
 Complete any required app review and billing setup in the portal. Keep your Client Secret private. See [Tesla's authentication guide](https://developer.tesla.com/docs/fleet-api/authentication/overview) and [billing documentation](https://developer.tesla.com/docs/fleet-api/billing-and-limits).
 
@@ -123,3 +123,20 @@ Both paths preserve configuration, keys, tokens, saved readings and the active w
 - **Port 8765 unavailable:** close an earlier sign-in attempt or free the local port before reconnecting.
 
 Do not paste tokens, callback URLs, VINs or private profile files into GitHub issues. Use fictional examples and redact screenshots.
+
+## Sentry and Location
+
+**Sentry** uses `vehicle_cmds` and the existing paired virtual key. Clicking on/off may wake an unavailable vehicle. A normal refresh only reads Sentry state.
+
+**Location** is disabled by default. To enable it:
+
+1. In the Tesla Developer portal, open your app’s scope management and enable **Vehicle Location**.
+2. In xBar, choose **Location → Enable Location…**.
+3. On Tesla’s consent page, allow **Vehicle Location**. Existing battery and command permissions remain requested.
+4. Refresh the plugin while the vehicle is online. The Location submenu shows the address and **Open in Apple Maps**. It does not automatically wake the car.
+
+Enabling Location shares the vehicle’s latitude/longitude with Apple’s geocoding service to obtain an address. It does not read your Mac’s location or send Apple your Tesla credentials or VIN. Address lookup runs only when needed and is bounded to eight seconds; no daemon is installed. Existing coordinates reuse their matching address. Changed coordinates never inherit the old address.
+
+Offline/asleep vehicles retain the last known position and its original time. If Apple has no address or lookup fails, the map still opens the coordinate. An address may lack a house number or describe the nearest street; it cannot identify an exact parking space. Tesla may show its location-sharing indicator in the vehicle.
+
+**Disable Location** clears the saved location/address and rendered map link and stops requesting GPS data. It does not revoke Tesla’s server-side permission; use Tesla account permissions to revoke that separately.

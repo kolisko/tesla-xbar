@@ -33,7 +33,7 @@ REDIRECT = "http://localhost:8765/callback"
 DEFAULTS = {"region": "eu", "redirect_uri": REDIRECT, "display_mode": "range"}
 STALE_AFTER_SECONDS = 30 * 60
 UNVERIFIED_TEXT_COLOR = "#A0A6AD"
-STATUS_ICON_ORDER = ("charging", "camp", "pet", "fan", "unlocked")
+STATUS_ICON_ORDER = ("charging", "camp", "pet", "fan", "unlocked", "sentry")
 VEHICLE_COMMANDS = {
     "charge-start": ("charging-start", "Start charging", "charge_start"),
     "charge-stop": ("charging-stop", "Stop charging", "charge_stop"),
@@ -46,6 +46,8 @@ VEHICLE_COMMANDS = {
     "climate-pet": ("climate-keeper", "Pet Mode", "set_climate_keeper_mode"),
     "climate-mode-off": ("climate-keeper", "Turn modes off", "set_climate_keeper_mode"),
     "climate-set-temp": ("climate-set-temp", "Set temperature", "set_temps"),
+    "sentry-on": ("sentry-mode", "Turn Sentry on", "set_sentry_mode"),
+    "sentry-off": ("sentry-mode", "Turn Sentry off", "set_sentry_mode"),
 }
 CLIMATE_MODES = {"climate-keep": ("on", 1), "climate-pet": ("dog", 2),
                  "climate-camp": ("camp", 3), "climate-mode-off": ("off", 0)}
@@ -249,6 +251,9 @@ class Client:
         elif command == "climate-set-temp":
             arguments = [f"{temperature:g}C"]
             body = {"driver_temp": temperature, "passenger_temp": temperature}
+        elif command.startswith("sentry-"):
+            arguments = ["on" if command == "sentry-on" else "off"]
+            body = {"on": command == "sentry-on"}
         if not capabilities["signing_required"]:
             path = "/api/1/vehicles/" + urllib.parse.quote(vin, safe="") + "/command/" + endpoint
             response = self.request(path, body=body).get("response", {})
@@ -320,7 +325,7 @@ def command_error(text, command=""):
     for needles, message in (
         (("has not been paired", "not on whitelist", "unknown key"), "First add the app key to your vehicle using the Tesla mobile app."),
         (("403", "forbidden", "insufficient scope"), "Tesla denied the command. Allow Vehicle Commands via Connect Tesla account."
-         if command.startswith("climate-") else "Tesla denied the command. Allow Vehicle Charging Management via Connect Tesla account."),
+         if command.startswith(("climate-", "sentry-")) else "Tesla denied the command. Allow Vehicle Charging Management via Connect Tesla account."),
         (("unrecognized command",), "Update the command helper: run python3 -m scripts.install from the project folder."),
         (("401", "unauthorized"), "Your session has expired. Connect your Tesla account again."),
         (("no_power", "no power"), "The charger is not supplying power."),
@@ -338,6 +343,10 @@ def command_error(text, command=""):
 
 def fetch_state(config, client=None):
     cache = read_json("cache.json")
+    location_enabled = config.get("location_enabled") is True
+    if not location_enabled:
+        cache.pop("location", None)
+        cache.pop("location_error", None)
     now = time.time()
     cache.pop("next_poll", None)
     if cache.get("retry_status") == 429 and now < cache.get("retry_at", 0):
@@ -368,9 +377,22 @@ def fetch_state(config, client=None):
         cache.pop("error", None)
         cache.pop("retry_at", None)
         cache.pop("retry_status", None)
+        location_allowed = location_enabled and "vehicle_location" in client.granted_scopes()
+        if location_enabled and not location_allowed:
+            cache.pop("location", None)
+            cache["location_error"] = "Allow Vehicle Location via Connect Tesla account."
         if cache["state"] == "online":
             path = "/api/1/vehicles/" + urllib.parse.quote(selected["vin"], safe="") + "/vehicle_data?endpoints=charge_state%3Bgui_settings%3Bclimate_state%3Bvehicle_state"
-            response = client.get(path).get("response")
+            try:
+                response = client.get(path + ("%3Blocation_data" if location_allowed else "")).get("response")
+            except APIError as exc:
+                if not location_allowed or exc.status != 403:
+                    raise
+                # A revoked location grant must not prevent battery/climate reads.
+                location_allowed = False
+                cache.pop("location", None)
+                cache["location_error"] = "Tesla denied location access. Connect your Tesla account again."
+                response = client.get(path).get("response")
             charge = response.get("charge_state") if isinstance(response, dict) else None
             if not isinstance(charge, dict) or not number(charge.get("battery_level")) or not 0 <= charge["battery_level"] <= 100:
                 raise AppError("Tesla has not provided battery data yet.")
@@ -388,7 +410,7 @@ def fetch_state(config, client=None):
                 ("climate_state", "climate", ("climate_keeper_mode", "is_climate_on", "driver_temp_setting",
                                               "passenger_temp_setting", "min_avail_temp", "max_avail_temp",
                                               "inside_temp", "outside_temp")),
-                ("vehicle_state", "vehicle_status", ("locked",)),
+                ("vehicle_state", "vehicle_status", ("locked", "sentry_mode")),
             ):
                 data = response.get(source)
                 snapshot = {key: data[key] for key in fields if key in data} if isinstance(data, dict) else {}
@@ -397,6 +419,8 @@ def fetch_state(config, client=None):
                     snapshot["updated_at"] = min(now, timestamp / 1000) if number(timestamp) and timestamp > 0 else now
                 # Missing fields must not make an older active state look fresh.
                 cache[destination] = snapshot
+            if location_allowed:
+                update_location(cache, response, now)
     except AppError as exc:
         cache["error"] = str(exc)
         cache["retry_status"] = exc.status if isinstance(exc, APIError) else None
@@ -488,7 +512,7 @@ def run_vehicle_command(config, command, client=None, temperature=None):
         report["vin"] = vin
         if command.startswith("charge-") and not capabilities["charging_authorized"]:
             raise AppError("Allow Vehicle Charging Management via Connect Tesla account.")
-        if command.startswith("climate-") and not capabilities.get("vehicle_authorized"):
+        if command.startswith(("climate-", "sentry-")) and not capabilities.get("vehicle_authorized"):
             raise AppError("Allow Vehicle Commands via Connect Tesla account.")
         if capabilities["signing_required"] and not capabilities["key_paired"]:
             raise AppError("First add the app key to your vehicle using the Tesla mobile app.")
@@ -535,10 +559,14 @@ def run_vehicle_command(config, command, client=None, temperature=None):
                     message = "Charging stopped • confirmed by the vehicle."
                 elif command.startswith("climate-") and climate_command_confirmed(fresh, command, temperature, sent_at):
                     message = label + " • confirmed by the vehicle."
+                elif (command.startswith("sentry-") and status_is_current(fresh, "vehicle_status")
+                      and fresh["vehicle_status"].get("updated_at", 0) >= sent_at
+                      and fresh["vehicle_status"].get("sentry_mode") is (command == "sentry-on")):
+                    message = label + " • confirmed by the vehicle."
         report.update(status="success", message=message)
     except (AppError, OSError, subprocess.SubprocessError) as exc:
         message = str(exc) if isinstance(exc, AppError) else "The command could not be completed."
-        if isinstance(exc, APIError) and exc.status == 403 and command.startswith("climate-"):
+        if isinstance(exc, APIError) and exc.status == 403 and command.startswith(("climate-", "sentry-")):
             message = "Tesla denied the command. Allow Vehicle Commands via Connect Tesla account."
         if accepted:
             message = "Some commands were accepted; " + message
@@ -661,6 +689,8 @@ def active_status_icons(cache):
             icons.append("fan")
     if status_is_current(cache, "vehicle_status") and cache["vehicle_status"].get("locked") is False:
         icons.append("unlocked")
+    if status_is_current(cache, "vehicle_status") and cache["vehicle_status"].get("sentry_mode") is True:
+        icons.append("sentry")
     return icons
 
 
@@ -689,6 +719,109 @@ def status_menu_lines(cache):
     if isinstance(vehicle.get("locked"), bool):
         label = "Vehicle" if status_is_current(cache, "vehicle_status") else "Last known vehicle lock"
         lines.append(f"{label}: {'locked' if vehicle['locked'] else 'unlocked'}")
+    return lines
+
+
+def sentry_menu(cache, vehicle_action):
+    state = (cache.get("vehicle_status") or {}).get("sentry_mode")
+    current = status_is_current(cache, "vehicle_status")
+    label = "Sentry" if current else "Last known Sentry"
+    value = ("on" if state else "off") if isinstance(state, bool) else "unavailable"
+    lines = ["Sentry", f"--{label}: {value} | color=gray", "-----"]
+    for command in ("sentry-on", "sentry-off"):
+        checked = current and state is (command == "sentry-on")
+        label = ("✓ " if checked else "") + VEHICLE_COMMANDS[command][1]
+        lines.append("--" + vehicle_action(label, "command", command))
+    return lines
+
+
+def coordinates(data):
+    if not isinstance(data, dict):
+        return None
+    lat, lon = data.get("latitude"), data.get("longitude")
+    if number(lat) and number(lon) and -90 <= lat <= 90 and -180 <= lon <= 180:
+        return lat, lon
+    return None
+
+
+def reverse_geocode(point):
+    """Apple's geocoder; no Tesla credentials, VIN, or Mac location access."""
+    try:
+        result = subprocess.run([str(HERE / "tesla-location")],
+            input=json.dumps({"latitude": point[0], "longitude": point[1]}),
+            capture_output=True, text=True, timeout=9, umask=0o077)
+        if result.returncode == 0:
+            address = json.loads(result.stdout).get("address")
+            if isinstance(address, str) and address.strip():
+                return address.strip()[:500]
+    except (OSError, subprocess.SubprocessError, ValueError, AttributeError):
+        pass
+    return None
+
+
+def update_location(cache, response, now):
+    # Fleet API requests location_data, but returns GPS in drive_state.
+    data = response.get("drive_state")
+    point = coordinates(data)
+    if point is None:
+        cache["location_error"] = "Tesla has not provided a current location."
+        return
+    previous = cache.get("location") or {}
+    timestamp = data.get("timestamp")
+    if not number(timestamp) or timestamp <= 0 or timestamp / 1000 > now + 60:
+        cache["location_error"] = "Tesla has not provided a valid location timestamp."
+        return
+    stamp = min(now, timestamp / 1000)
+    if number(previous.get("updated_at")) and stamp < previous["updated_at"]:
+        cache["location_error"] = "Tesla returned an older location. Keeping the last known position."
+        return
+    snapshot = {"latitude": point[0], "longitude": point[1], "updated_at": stamp}
+    # An address belongs only to the exact coordinates which were looked up.
+    same_point = point == coordinates(previous)
+    if same_point and previous.get("address"):
+        snapshot["address"] = previous["address"]
+    attempted = previous.get("geocoded_at", 0)
+    snapshot["geocoded_at"] = attempted
+    if not snapshot.get("address") and now - attempted >= 60:
+        snapshot["geocoded_at"] = now
+        address = reverse_geocode(point)
+        if address:
+            snapshot["address"] = address
+    cache["location"] = snapshot
+    cache.pop("location_error", None)
+
+
+def location_menu(cache, config):
+    lines = ["Location"]
+    if config.get("location_enabled") is not True:
+        lines.extend(["--Location is disabled | color=gray",
+                      "--Address lookup shares vehicle coordinates with Apple | color=gray",
+                      "--" + action("Enable Location…", "location-enable", terminal=True)])
+        return lines
+    location = cache.get("location") or {}
+    point = coordinates(location)
+    current = status_is_current(cache, "location") and not cache.get("location_error")
+    if point is not None:
+        label = "Address" if current else "Last known address"
+        address = location.get("address")
+        if isinstance(address, str) and address:
+            # Split multiline postal addresses into safe, non-actionable menu rows.
+            lines.append(f"--{label} | color=gray")
+            for part in address.splitlines()[:6]:
+                lines.append("--" + safe_text(part) + " | color=gray")
+        else:
+            lines.append("--Address unavailable • position available on map | color=gray")
+        stamp = location.get("updated_at")
+        if number(stamp) and stamp > 0:
+            lines.append("--Location reading from " + dt.datetime.fromtimestamp(stamp).strftime("%d %b %H:%M") + " | color=gray")
+        url = "https://maps.apple.com/?" + urllib.parse.urlencode({"ll": f"{point[0]:.6f},{point[1]:.6f}", "q": "Tesla", "z": "17"})
+        lines.append("--" + ("Open in Apple Maps" if current else "Open last known position in Apple Maps") + " | href=" + url)
+    else:
+        lines.append("--Location is not available yet | color=gray")
+    if cache.get("location_error"):
+        lines.append("--" + safe_text(cache["location_error"]) + " | color=gray")
+    lines.extend(["-----", "--" + action("Connect Tesla account…", "authorize", terminal=True),
+                  "--" + action("Disable Location", "location-disable")])
     return lines
 
 
@@ -828,13 +961,15 @@ def render(cache, config, demo=False):
     if setup.get("vin") == cache.get("vin") and setup.get("signing_required") and not setup.get("key_paired"):
         lines.append("--First add the app key to your vehicle | color=gray")
     for command, (_, label, _) in VEHICLE_COMMANDS.items():
-        if not command.startswith("climate-"):
+        if command.startswith(("charge-", "port-")):
             lines.append("--" + vehicle_action(label, "command", command))
     domain = config.get("domain", "")
     if domain and "/" not in domain and ":" not in domain:
         lines.append("--Add key to vehicle… | href=https://www.tesla.com/_ak/" + domain)
     lines.append("--" + vehicle_action("Check command setup", "command-setup"))
     lines.extend(clima_menu(cache, vehicle_action))
+    lines.extend(sentry_menu(cache, vehicle_action))
+    lines.extend(location_menu(cache, config))
     lines.extend(["---", "Refresh now | refresh=true",
                   vehicle_action("Wake vehicle and refresh", "wake-refresh"),
                   action("Connect Tesla account…", "authorize", terminal=True),
@@ -1067,7 +1202,7 @@ def authorize(config, launch=True):
         raise AppError(f"Port {parsed.port} is already in use or unavailable.") from None
     server.timeout = 1
     url = AUTH_URL + "?" + urllib.parse.urlencode({"client_id": config["client_id"],
-        "redirect_uri": config["redirect_uri"], "response_type": "code", "scope": SCOPES,
+        "redirect_uri": config["redirect_uri"], "response_type": "code", "scope": SCOPES + (" vehicle_location" if config.get("location_enabled") is True else ""),
         "state": state, "locale": "en-US", "require_requested_scopes": "true", "prompt_missing_scopes": "true"})
     save_json("authorization.json", {"url": url, "expires_at": time.time() + 600})
     print("Tesla sign-in is ready (expires in 10 minutes).", flush=True)
@@ -1087,7 +1222,7 @@ def authorize(config, launch=True):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("command", nargs="?", default="menu", choices=["menu", "refresh", "wake-refresh", "command", "command-setup", "configure", "provision", "register", "authorize", "select", "display", "demo"])
+    parser.add_argument("command", nargs="?", default="menu", choices=["menu", "refresh", "wake-refresh", "command", "command-setup", "configure", "provision", "register", "authorize", "location-enable", "location-disable", "select", "display", "demo"])
     parser.add_argument("value", nargs="?")
     parser.add_argument("--vin", help="Vehicle bound to the clicked menu item")
     parser.add_argument("--temperature", help="Target Celsius temperature for climate-set-temp")
@@ -1102,6 +1237,20 @@ def main():
             provision(config, launch=not args.no_browser)
         elif args.command == "authorize":
             authorize(config, launch=not args.no_browser)
+        elif args.command in ("location-enable", "location-disable"):
+            with locked(blocking=False):
+                config = configuration()
+                config["location_enabled"] = args.command == "location-enable"
+                save_json("config.json", config)
+                if not config["location_enabled"]:
+                    cache = read_json("cache.json")
+                    cache.pop("location", None)
+                    cache.pop("location_error", None)
+                    save_json("cache.json", cache)
+                    publish_display(cache, config, render(cache, config))
+            if config["location_enabled"]:
+                print("Location uses Tesla GPS data. Address lookup shares those coordinates with Apple.")
+                authorize(config, launch=not args.no_browser)
         elif args.command == "register":
             with locked():
                 register(config)
