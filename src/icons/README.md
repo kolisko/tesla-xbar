@@ -1,8 +1,14 @@
 # Status icons
 
 Editable SVG artwork and prebuilt Retina PNG template images for charging, Camp
-Mode, Pet Mode, running climate, an unlocked vehicle, and Sentry Mode. The 47 PNG strips cover every
+Mode, Pet Mode, running climate, an unlocked vehicle, Sentry Mode, an open front
+trunk and an open rear trunk. The 191 PNG strips cover every
 valid combination (Camp and Pet Mode are mutually exclusive).
+
+The trunk icons use the front (`ft`) and rear (`rt`) closure readings independently
+of the vehicle's lock state. Both may appear together. They require a current
+online reading, like the other vehicle-state icons; unavailable or stale readings
+remain text in **Locks and trunks** instead. Open includes an unlatched/ajar lid.
 
 xBar places all icons, including the charging bolt, in the same monochrome strip
 before the range or percentage. macOS chooses

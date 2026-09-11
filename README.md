@@ -18,7 +18,7 @@ Open the menu to see battery percentage, Tesla's range, charge limit, cable conn
 
 <img src="docs/images/states.png" alt="Eight display examples: charging, connected but paused, orange and red low range, and asleep or offline with a last known connected or unplugged cable" width="1000">
 
-<img src="docs/images/status-icons.png" alt="Matching monochrome charging bolt, Camp Mode tent, Pet Mode paw, climate fan, unlocked padlock and Sentry symbol before the range" width="940">
+<img src="docs/images/status-icons.png" alt="Matching monochrome charging, Camp, Pet, fan, unlock, Sentry and open front/rear trunk icons before the range" width="940">
 
 Open **Clima** to see inside and outside temperatures, change climate modes, turn climate on or off, or set the target temperature for both front zones. Measured temperatures are shown separately from **Target temperature**.
 
@@ -36,7 +36,7 @@ Open **Sentry** for on/off controls and **Location** for the address, optional m
 
 - **Range or percentage:** switch through **Menu bar display**. Range comes directly from Tesla's range fields and uses the vehicle's distance units.
 - **Cable and charging status:** green text when connected, including scheduled or paused charging. Fresh online charging adds a monochrome lightning icon before the label, matching the other status icons.
-- **Live vehicle indicators:** a tent for Camp Mode, a paw for Pet Mode, a fan while climate is on, an open padlock when the vehicle is unlocked, and a concentric-circle Sentry symbol when Sentry is on. Active indicators appear together before the range or percentage; their names also appear in the menu.
+- **Live vehicle indicators:** a tent for Camp Mode, a paw for Pet Mode, a fan while climate is on, an open padlock when the vehicle is unlocked, a concentric-circle Sentry symbol when Sentry is on, and separate car silhouettes for an open front or rear trunk. The trunk indicators use their own closure readings independently of the lock state; both can appear together. Active indicators appear together before the range or percentage; their states also appear in the menu.
 - **Low-range colors:** orange below 350 km and red below 300 km when unplugged. Connected cable status takes precedence.
 - **Last known data:** asleep and offline readings keep the saved range or percentage and add a small trailing dot, such as `360 km ·` or `73% ·`. Connection state does not change the text color: a last known connected cable stays green, and unplugged readings keep the normal range colors. Failed or stale readings retain their values and colors too; the dot specifically indicates offline/asleep. The connection state and original reading timestamp stay visible in the menu.
 - **One refresh schedule:** xBar's filename controls polling (`1m`, `5m`, etc.). **Refresh now** uses the same path. No second polling timer or invented monthly quota.
@@ -171,7 +171,7 @@ GitHub checks include **CodeQL for Python and Swift, Gitleaks, a privacy scan, D
 - Offline is not proof of sleep. An HTTP 408 is treated as unavailable. The menu distinguishes confirmed sleep from offline status. Both add a small dot after the range or percentage and keep the usual cable/range color, rather than switching to gray.
 - Green can reflect a saved cable connection. A disconnection cannot be reflected until new vehicle data is received; the menu labels the saved state as **Last known cable state**. Only confirmed live charging gets a lightning symbol.
 - An offline/asleep reading can be old. The plugin keeps it and shows its timestamp; it never fabricates a fresh value.
-- Climate, unlock and Sentry icons require an online vehicle, a successful refresh and a section timestamp less than 30 minutes old. They disappear for offline/asleep states, failed refreshes or stale data; saved status text in the menu is then labeled **Last known**. Missing fields do not imply that climate is on or the car is unlocked. Icons reflect the last successful poll, not a push connection to the car.
+- Climate, unlock, Sentry and trunk icons require an online vehicle, a successful refresh and a section timestamp less than 30 minutes old. They disappear for offline/asleep states, failed refreshes or stale data; saved status text in the menu is then labeled **Last known**. Missing fields do not imply that climate is on, the car is unlocked or a trunk is open. Icons reflect the last successful poll, not a push connection to the car.
 - An address is the closest postal address returned by Apple, not a guarantee of the exact parking bay or house number. If lookup fails, the coordinate-based map link remains available. Tesla may show a location-sharing indicator in the vehicle while location is being requested.
 - Range is never estimated from battery percentage. API miles are converted to kilometers only when required by the vehicle's units.
 - Range/percentage selection is local. Automatic synchronization with the Tesla mobile app's display preference is not implemented.

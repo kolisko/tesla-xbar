@@ -34,7 +34,7 @@ SCOPES = "openid offline_access vehicle_device_data vehicle_cmds vehicle_chargin
 REDIRECT = "http://localhost:8765/callback"
 DEFAULTS = {"region": "eu", "redirect_uri": REDIRECT, "display_mode": "range"}
 STALE_AFTER_SECONDS = 30 * 60
-STATUS_ICON_ORDER = ("charging", "camp", "pet", "fan", "unlocked", "sentry")
+STATUS_ICON_ORDER = ("charging", "camp", "pet", "fan", "unlocked", "sentry", "frunk", "trunk")
 MAP_IMAGE_LIMIT = 3_000_000
 MAP_IMAGE_FILE = "location-map.png"
 VEHICLE_COMMANDS = {
@@ -738,6 +738,10 @@ def active_status_icons(cache):
         icons.append("unlocked")
     if status_is_current(cache, "vehicle_status") and cache["vehicle_status"].get("sentry_mode") is True:
         icons.append("sentry")
+    if status_is_current(cache, "vehicle_status"):
+        for field, icon in (("ft", "frunk"), ("rt", "trunk")):
+            if trunk_open_state(cache["vehicle_status"], field) is True:
+                icons.append(icon)
     return icons
 
 
