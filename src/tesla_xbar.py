@@ -32,7 +32,6 @@ SCOPES = "openid offline_access vehicle_device_data vehicle_cmds vehicle_chargin
 REDIRECT = "http://localhost:8765/callback"
 DEFAULTS = {"region": "eu", "redirect_uri": REDIRECT, "display_mode": "range"}
 STALE_AFTER_SECONDS = 30 * 60
-UNVERIFIED_TEXT_COLOR = "#A0A6AD"
 STATUS_ICON_ORDER = ("charging", "camp", "pet", "fan", "unlocked", "sentry")
 VEHICLE_COMMANDS = {
     "charge-start": ("charging-start", "Start charging", "charge_start"),
@@ -896,11 +895,11 @@ def render(cache, config, demo=False):
     charging = charging_is_current(cache, config)
     connected = cable_connected(charge)
     color = battery_color(cache)
-    if unverified and connected is not True:
-        color = UNVERIFIED_TEXT_COLOR
     distance = vehicle_range(cache)
     value = (f"{level:g}%" if level is not None else None) if config.get("display_mode") == "percent" else distance
     top = f"{'DEMO ' if demo else ''}{value if value is not None else '—'}"
+    if cache.get("state") in ("offline", "asleep"):
+        top += " ·"
     params = [f"color={color}"] if color else []
     icon_image = status_icon_image(active_status_icons(cache))
     if icon_image:
@@ -944,9 +943,8 @@ def render(cache, config, demo=False):
         lines.extend(["---", safe_text(cache["error"]) + " | color=#D9534F"])
     if cache.get("wake_in_progress"):
         lines.append("Waking the vehicle and waiting for it to connect… | color=gray")
-    if unverified and value is not None:
-        lines.append(("Green text reflects the last known cable connection." if connected is True
-                      else "Gray text marks a last known or unverified reading.") + " | color=gray")
+    if unverified and value is not None and connected is True:
+        lines.append("Green text reflects the last known cable connection. | color=gray")
     report = read_json("command-result.json")
     if report and report.get("vin") in (None, cache.get("vin")):
         stamp = dt.datetime.fromtimestamp(report.get("at", 0)).strftime("%H:%M")

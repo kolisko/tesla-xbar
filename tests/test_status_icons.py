@@ -90,11 +90,12 @@ class StatusIconTests(unittest.TestCase):
             with self.subTest(changes=changes):
                 cache = self.cache() | changes
                 menu = app.render(cache, self.config)
-                self.assertEqual(menu.splitlines()[0], "360 km | color=#32CD66")
+                dot = " ·" if cache.get("state") in ("asleep", "offline") else ""
+                self.assertEqual(menu.splitlines()[0], f"360 km{dot} | color=#32CD66")
                 self.assertIn("Last known climate mode: Camp Mode", menu)
                 self.assertIn("Last known climate: on", menu)
                 self.assertIn("Last known vehicle lock: unlocked", menu)
-                self.assertEqual(app.render(cache, self.config | {"display_mode": "percent"}).splitlines()[0], "73% | color=#32CD66")
+                self.assertEqual(app.render(cache, self.config | {"display_mode": "percent"}).splitlines()[0], f"73%{dot} | color=#32CD66")
 
     def test_partial_success_replaces_old_active_fields(self):
         for sections in ({}, {"climate_state": None, "vehicle_state": None},

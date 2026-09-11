@@ -36,16 +36,17 @@ class ReliabilityTests(unittest.TestCase):
         baseline = self.seed()
         for state in ("asleep", "offline", "unknown", None):
             for charge, gui, color in ((baseline["charge"], baseline["gui_settings"], "#32CD66"),
-                                       (baseline["charge"], {}, "#32CD66"), ({}, {}, "#A0A6AD"),
+                                       (baseline["charge"], {}, "#32CD66"), ({}, {}, None),
                                        (baseline["charge"] | {"charging_state": "Disconnected"},
-                                        baseline["gui_settings"], "#A0A6AD")):
+                                        baseline["gui_settings"], "#EF4444")):
                 cache = baseline | {"state": state, "charge": charge, "gui_settings": gui}
                 top = app.render(cache, self.config).splitlines()[0]
                 value = "161 km" if gui else "—"
-                self.assertEqual(top, f"{value} | color={color}")
+                dot = " ·" if state in ("asleep", "offline") else ""
+                self.assertEqual(top, value + dot + (f" | color={color}" if color else ""))
         for state in ("asleep", "offline"):
             self.assertEqual(app.render({"state": state}, self.config).splitlines()[0],
-                             "— | color=#A0A6AD")
+                             "— ·")
         self.assertEqual(app.active_status_icons(baseline), ["charging"])
         self.assertIn("templateImage=", app.render(baseline, self.config).splitlines()[0])
 
@@ -80,7 +81,7 @@ class ReliabilityTests(unittest.TestCase):
             self.assertEqual(client.calls, ["/api/1/vehicles"])
             for mode, value in (("range", "161 km"), ("percent", "72%")):
                 menu = app.render(cache, self.config | {"display_mode": mode})
-                self.assertEqual(menu.splitlines()[0], f"{value} | color=#32CD66")
+                self.assertEqual(menu.splitlines()[0], f"{value} · | color=#32CD66")
                 self.assertIn("Battery reading from", menu)
                 self.assertIn("Last known cable state: connected", menu)
                 self.assertIn("Green text reflects the last known cable connection.", menu)
@@ -109,9 +110,8 @@ class ReliabilityTests(unittest.TestCase):
                 for changes in ({"error": "Network unavailable"},
                                 {"updated_at": 10_000 - app.STALE_AFTER_SECONDS}):
                     with self.subTest(charging_state=charging_state, changes=changes):
-                        cached_color = "#A0A6AD" if charging_state == "Disconnected" else "#32CD66"
                         self.assertEqual(app.render(cache | changes, self.config).splitlines()[0],
-                                         f"161 km | color={cached_color}")
+                                         f"161 km | color={color}")
                 top = app.render(cache, self.config).splitlines()[0]
                 self.assertEqual(top.split(" templateImage=")[0], f"161 km | color={color}")
                 self.assertEqual("templateImage=" in top, charging_state == "Charging")
@@ -119,7 +119,7 @@ class ReliabilityTests(unittest.TestCase):
     def test_fresh_disconnect_replaces_saved_connected_green(self):
         self.seed()
         cache = app.fetch_state(self.config, client=FakeClient(state="offline"))
-        self.assertEqual(app.render(cache, self.config).splitlines()[0], "161 km | color=#32CD66")
+        self.assertEqual(app.render(cache, self.config).splitlines()[0], "161 km · | color=#32CD66")
         client = FakeClient()
         original = client.get
         def get(path):

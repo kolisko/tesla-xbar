@@ -6,7 +6,7 @@ These illustrations show the plugin's appearance using fictional data and a neut
 | --- | --- |
 | [`menu-bar.svg`](menu-bar.svg), [`menu-bar.png`](menu-bar.png) | Monochrome charging bolt before the green range label. |
 | [`menu.svg`](menu.svg), [`menu.png`](menu.png) | Expanded menu with battery readings, charging controls and settings. |
-| [`states.svg`](states.svg), [`states.png`](states.png) | Eight examples: charging, connected, low range, and asleep/offline with either a last known connected cable (green) or unplugged cable (gray). Unavailable readings have no status icon. |
+| [`states.svg`](states.svg), [`states.png`](states.png) | Eight examples: charging, connected, low range, and asleep/offline with either a last known connected cable (green) or unplugged cable (normal range color). Offline/asleep readings have a small trailing dot and no active status icons. |
 | [`status-icons.svg`](status-icons.svg), [`status-icons.png`](status-icons.png) | Matching charging, Camp Mode, Pet Mode, climate fan and open padlock icons, plus a combined menu-bar example. |
 | [`clima.svg`](clima.svg), [`clima.png`](clima.png) | Clima controls for modes, temperature and shutdown. |
 

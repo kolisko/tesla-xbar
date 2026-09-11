@@ -114,7 +114,7 @@ Both paths preserve configuration, keys, tokens, saved readings and the active w
 
 ## Troubleshooting
 
-- **Offline / asleep:** the last known reading remains visible. A last known connected cable keeps the text green; otherwise it is gray. The original timestamp and **Last known cable state** remain in the menu. Use the explicit wake action only when you want to wake the car.
+- **Offline / asleep:** the last known reading remains visible. A small trailing dot marks offline/asleep (for example, `360 km ·`). A last known connected cable keeps the text green; unplugged readings keep their usual range color. The original timestamp and **Last known cable state** remain in the menu. Use the explicit wake action only when you want to wake the car.
 - **No data yet:** confirm registration, region, consent and the vehicle's connectivity.
 - **Missing key:** pair your own app key in the Tesla mobile app. Do not create a new key to fix an existing profile unless you also update the hosted public key and vehicle pairing.
 - **Expired login:** reconnect the account. Tokens normally refresh automatically.
