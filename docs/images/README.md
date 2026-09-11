@@ -15,3 +15,5 @@ the status-icons preview together with the runtime PNG assets. Its optional
 development dependencies are described in the [scripts guide](../../scripts/README.md).
 
 [`scripts/render_previews.py`](../../scripts/render_previews.py) generates the SVG sources. The PNG versions are rendered from those SVGs for reliable display in the [main README](../../README.md#see-it-in-action). If changing an illustration, update both formats and check the rendered result. Keep PNGs free of personal information and embedded metadata; the public-file scan checks tracked PNGs for text and EXIF metadata.
+
+`sentry-location.svg` / `.png` illustrate the Sentry and Location submenus with fictional labels and an illustrative address. The previews contain no user location or map screenshot.

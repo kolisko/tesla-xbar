@@ -32,3 +32,5 @@ any SVG changes. The plugin uses only the committed PNGs.
 The shell entry point is generated inside `install.py`, rather than stored with a hard-coded path. Compilation outputs, module caches and the downloaded SDK belong in the ignored root `build/` directory. Credentials and signing keys belong in the user's private profile, outside the repository.
 
 See the [setup guide](../docs/SETUP.md) and [contribution guide](../.github/CONTRIBUTING.md).
+
+The installer also builds `tesla-location` from `src/location.swift` for optional Apple reverse geocoding. Runtime-only updates require this helper to exist.

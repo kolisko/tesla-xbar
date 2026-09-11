@@ -20,7 +20,7 @@ class InstallTests(unittest.TestCase):
         (self.source / "src" / "tesla_xbar.py").write_text("# generic code\n")
         (self.source / "src" / "icons").mkdir()
         (self.source / "src" / "icons" / "fan.png").write_bytes(b"example icon")
-        for name in ("tesla-control", "tesla-keychain"):
+        for name in ("tesla-control", "tesla-keychain", "tesla-location"):
             (self.target / name).write_bytes(b"existing helper")
 
     def test_new_profile_gets_unique_key_outside_source(self):

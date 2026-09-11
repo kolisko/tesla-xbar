@@ -142,8 +142,8 @@ class StatusIconTests(unittest.TestCase):
         combinations = []
         for charging, mode in itertools.product((False, True), (None, "camp", "pet")):
             for fan in (False, True):
-                for unlocked in (False, True):
-                    names = [name for name in ("charging" if charging else None, mode, "fan" if fan else None, "unlocked" if unlocked else None) if name]
+                for unlocked, sentry in itertools.product((False, True), repeat=2):
+                    names = [name for name in ("charging" if charging else None, mode, "fan" if fan else None, "unlocked" if unlocked else None, "sentry" if sentry else None) if name]
                     if not names:
                         continue
                     combinations.append(names)
@@ -158,7 +158,7 @@ class StatusIconTests(unittest.TestCase):
                             chunks[png[offset + 4:offset + 8]] = png[offset + 8:offset + 8 + length]
                             offset += length + 12
                         self.assertEqual(struct.unpack(">IIB", chunks[b"pHYs"]), (5669, 5669, 1))
-        self.assertEqual(len(combinations), 23)
+        self.assertEqual(len(combinations), 47)
         self.assertEqual(app.status_icon_image(["camp", "pet"]), "")
 
     def test_missing_asset_keeps_textual_status_available(self):

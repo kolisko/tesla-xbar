@@ -3,5 +3,6 @@
   "client_id": "YOUR_TESLA_CLIENT_ID",
   "domain": "your-app.example.com",
   "redirect_uri": "http://localhost:8765/callback",
-  "display_mode": "range"
+  "display_mode": "range",
+  "location_enabled": false
 }

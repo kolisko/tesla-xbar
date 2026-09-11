@@ -30,8 +30,8 @@ bar += '<rect x="8" y="8" width="237" height="50" rx="22" fill="#ffffff" fill-op
 bar += bolt(24, 18, 1.7) + text(67, 44, '360 km', 30, '#32cd66')
 (OUT / 'menu-bar.svg').write_text(svg(320, 66, bar))
 
-body = '<rect width="600" height="1081" rx="22" fill="url(#blue)"/>'
-body += '<rect x="4" y="4" width="592" height="1073" rx="18" fill="url(#panel)" stroke="#8fa3af" stroke-opacity="0.5"/>'
+body = '<rect width="600" height="1183" rx="22" fill="url(#blue)"/>'
+body += '<rect x="4" y="4" width="592" height="1175" rx="18" fill="url(#panel)" stroke="#8fa3af" stroke-opacity="0.5"/>'
 body += text(27, 47, 'Tesla', 27, '#dce4eb', 600)
 rows = ['Battery: 73 %', 'Tesla range: 360 km', 'Charge limit: 80 %', 'Cable: connected',
         'Charging', 'Power: 11 kW', 'Time to charge limit: 0 h 30 min', 'Battery reading from 12 Jul 09:41']
@@ -42,19 +42,19 @@ def divider(y):
     return f'<path d="M27 {y}H573" stroke="#95a7b1" stroke-opacity="0.3"/>'
 
 body += divider(440)
-for y, label, sub in [(486, 'Charging and port', True), (537, 'Clima', True), (604, 'Refresh now', False),
-                      (651, 'Wake vehicle and refresh', False), (698, 'Connect Tesla account…', False),
-                      (745, 'Settings…', False), (792, 'Menu bar display', True)]:
+for y, label, sub in [(486, 'Charging and port', True), (537, 'Clima', True), (588, 'Sentry', True), (639, 'Location', True), (706, 'Refresh now', False),
+                      (753, 'Wake vehicle and refresh', False), (800, 'Connect Tesla account…', False),
+                      (847, 'Settings…', False), (894, 'Menu bar display', True)]:
     body += text(27, y, label, 25)
     if sub:
         body += f'<path d="m562 {y-17} 7 7-7 7" fill="none" stroke="#e5e9ed" stroke-width="2.5"/>'
-body += divider(562) + divider(825)
-body += text(27, 868, 'Refresh interval managed by xBar', 23, '#aebdc8')
-body += text(27, 915, 'Tesla Developer', 25)
-body += text(27, 962, 'Manage Tesla permissions', 25)
-body += divider(995) + text(27, 1040, 'xbar', 25)
-body += '<path d="m562 1023 7 7-7 7" fill="none" stroke="#e5e9ed" stroke-width="2.5"/>'
-(OUT / 'menu.svg').write_text(svg(600, 1081, body))
+body += divider(664) + divider(927)
+body += text(27, 970, 'Refresh interval managed by xBar', 23, '#aebdc8')
+body += text(27, 1017, 'Tesla Developer', 25)
+body += text(27, 1064, 'Manage Tesla permissions', 25)
+body += divider(1097) + text(27, 1142, 'xbar', 25)
+body += '<path d="m562 1125 7 7-7 7" fill="none" stroke="#e5e9ed" stroke-width="2.5"/>'
+(OUT / 'menu.svg').write_text(svg(600, 1183, body))
 
 body = '<rect width="1326" height="380" rx="20" fill="#111c29"/>'
 examples = [('Charging', '360 km', '#32cd66', 'bolt'), ('Connected · paused', '360 km', '#32cd66', ''),
@@ -84,4 +84,20 @@ body += text(28, 563, 'Turn modes off', 24)
 body += text(28, 610, 'Turn climate and modes off', 24)
 body += text(28, 667, 'Illustrative data · Temperature sets both front zones', 17, '#a0a6ad')
 (OUT / 'clima.svg').write_text(svg(600, 702, body))
-print('Created four SVG previews using fictional data only.')
+body = '<rect width="1080" height="445" rx="20" fill="#111c29"/>'
+body += '<rect x="16" y="16" width="430" height="413" rx="16" fill="#202932"/>'
+body += '<rect x="464" y="16" width="600" height="413" rx="16" fill="#202932"/>'
+body += text(40, 62, 'Sentry', 26, weight=600)
+body += text(40, 112, 'Sentry: on', 22, '#a0a6ad')
+body += text(40, 174, '✓ Turn Sentry on', 24)
+body += text(40, 225, 'Turn Sentry off', 24)
+body += text(488, 62, 'Location', 26, weight=600)
+for y, label in [(109, 'Address'), (147, 'Example Street 1'), (182, 'Example City'),
+                 (221, 'Location reading from 12 Jul 09:41')]:
+    body += text(488, y, label, 22, '#a0a6ad')
+body += text(488, 278, 'Open in Apple Maps', 24)
+body += text(488, 329, 'Connect Tesla account…', 24)
+body += text(488, 380, 'Disable Location', 24)
+body += text(40, 397, 'Illustrative data', 18, '#a0a6ad')
+(OUT / 'sentry-location.svg').write_text(svg(1080, 445, body))
+print('Created five SVG previews using fictional data only.')

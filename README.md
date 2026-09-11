@@ -4,7 +4,7 @@
 [![CodeQL](https://github.com/kolisko/tesla-xbar/actions/workflows/codeql.yml/badge.svg)](https://github.com/kolisko/tesla-xbar/actions/workflows/codeql.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-Your Tesla's battery range or percentage in the macOS menu bar, powered by the official Fleet API. Built for [xBar](https://xbarapp.com/), with English menus, local credential storage and explicit charging and climate controls.
+Your Tesla's battery range or percentage in the macOS menu bar, powered by the official Fleet API. Built for [xBar](https://xbarapp.com/), with English menus, local credential storage and explicit charging, climate and Sentry controls.
 
 <img src="docs/images/menu-bar.png" alt="Menu bar preview: monochrome lightning icon before a green 360 km label" width="320">
 
@@ -18,22 +18,28 @@ Open the menu to see battery percentage, Tesla's range, charge limit, cable conn
 
 <img src="docs/images/states.png" alt="Eight display examples: charging, connected but paused, orange and red low range, and asleep or offline with a last known connected or unplugged cable" width="1000">
 
-<img src="docs/images/status-icons.png" alt="Matching monochrome charging bolt, Camp Mode tent, Pet Mode paw, climate fan and unlocked padlock before the range" width="940">
+<img src="docs/images/status-icons.png" alt="Matching monochrome charging bolt, Camp Mode tent, Pet Mode paw, climate fan, unlocked padlock and Sentry symbol before the range" width="940">
 
 Open **Clima** to see inside and outside temperatures, change climate modes, turn climate on or off, or set the target temperature for both front zones. Measured temperatures are shown separately from **Target temperature**.
 
 <img src="docs/images/clima.png" alt="Clima submenu with Keep, Camp and Pet modes, temperature selection and full shutdown" width="420">
 
+Open **Sentry** for on/off controls and **Location** for the address and map link.
+
+<img src="docs/images/sentry-location.png" alt="Sentry on/off submenu and Location submenu with an illustrative address, timestamp and Apple Maps link" width="960">
+
 ## Features
 
 - **Range or percentage:** switch through **Menu bar display**. Range comes directly from Tesla's range fields and uses the vehicle's distance units.
 - **Cable and charging status:** green text when connected, including scheduled or paused charging. Fresh online charging adds a monochrome lightning icon before the label, matching the other status icons.
-- **Live vehicle indicators:** a tent for Camp Mode, a paw for Pet Mode, a fan while climate is on, and an open padlock when the vehicle is unlocked. Active indicators appear together before the range or percentage; their names also appear in the menu.
+- **Live vehicle indicators:** a tent for Camp Mode, a paw for Pet Mode, a fan while climate is on, an open padlock when the vehicle is unlocked, and a concentric-circle Sentry symbol when Sentry is on. Active indicators appear together before the range or percentage; their names also appear in the menu.
 - **Low-range colors:** orange below 350 km and red below 300 km when unplugged. Connected cable status takes precedence.
 - **Last known data:** asleep, offline and unverified readings keep the saved range or percentage without a status icon or dot. A last known connected cable keeps the text green; otherwise it becomes muted gray. This also applies after a failed refresh or when a reading is at least 30 minutes old. The connection state and original reading timestamp stay visible in the menu.
 - **One refresh schedule:** xBar's filename controls polling (`1m`, `5m`, etc.). **Refresh now** uses the same path. No second polling timer or invented monthly quota.
 - **Explicit commands:** wake and refresh, start/stop charging, open/close the charge port, and climate controls. Normal refresh never sends a wake or climate command.
 - **Clima submenu:** normal climate, Keep Climate On, Camp Mode, Pet Mode, temperature selection in 0.5 °C steps, modes off, and full climate/modes off. Temperature choices use the limits reported by the vehicle and set both front zones; changing the target alone does not turn climate on. Normal climate and full shutdown exit an active keeper mode first. Clicked actions can wake an unavailable vehicle before sending the command.
+- **Sentry submenu:** turn Sentry on or off using the existing Vehicle Commands permission. The active icon uses the same size, monochrome tint and placement as the other indicators.
+- **Location submenu (optional):** the vehicle’s reported address, reading time and a link that opens its position in Apple Maps. Requires Vehicle Location consent. Offline data is explicitly labeled as last known.
 - **Private profiles:** tokens and Client Secret in Keychain; configuration, signing key and cached readings in the current user's Application Support directory.
 - **Updates preserve your setup:** existing keys, credentials, readings and xBar interval remain intact.
 
@@ -52,6 +58,8 @@ flowchart TD
     P <--> D["Local configuration and saved readings"]
     P --> C["tesla-control: Go helper"]
     C -->|Signed vehicle commands| F
+    P -->|Optional coordinates over stdin| G["tesla-location: Swift geocoder"]
+    G --> A["Apple map services: postal address"]
 ```
 
 | Component | Responsibility |
@@ -61,12 +69,15 @@ flowchart TD
 | [`tesla_xbar.py`](src/tesla_xbar.py) | Python standard-library application: Fleet API requests, OAuth and token renewal, cached readings, menu rendering and action handling. |
 | [`icons/`](src/icons/README.md) | Prebuilt monochrome image strips for climate modes, running climate and an unlocked vehicle. Python includes the matching PNG in xBar's output; macOS supplies its tint. No runtime image renderer is needed. |
 | `tesla-keychain`, built from [`keychain.swift`](src/keychain.swift) | Small Swift executable that accesses macOS Keychain. Secrets are passed to it through stdin. |
+| `tesla-location`, built from [`location.swift`](src/location.swift) | Short-lived Swift helper using Apple’s reverse-geocoding service. Receives only vehicle coordinates over stdin and returns a postal address. It never requests the Mac’s location. |
 | `tesla-control`, built by [`build_commands.py`](scripts/build_commands.py) | Tesla's Go command tool, built from a pinned revision with a small [climate-keeper CLI adapter](src/commands/README.md). Python invokes it for commands requiring vehicle signatures. The SDK checkout remains unchanged. |
 | [`install.py`](scripts/install.py) | Builds the helpers, installs the runtime and launchers, and creates a signing key for a new profile. Updates reuse the existing private profile. |
 
 A normal refresh checks vehicle availability and reads live data when available; otherwise it retains the last known reading. Wake is a separate, explicit action. The Python application sends ordinary API requests itself and delegates commands requiring signatures to the Go helper.
 
-The same `vehicle_data` request includes `charge_state`, `gui_settings`, `climate_state` and `vehicle_state`. Climate and lock indicators require no additional API calls or permissions beyond the existing vehicle-data access. Saved climate fields are limited to the keeper mode, on/off state, inside/outside temperatures, both front temperature settings and the vehicle's available temperature limits; the saved lock field is `locked`. Each section keeps its own reading timestamp. Clima actions use the existing `vehicle_cmds` scope and paired signing key, where required. See [Tesla's documented commands](https://developer.tesla.com/docs/fleet-api/endpoints/vehicle-commands).
+The same `vehicle_data` request includes `charge_state`, `gui_settings`, `climate_state` and `vehicle_state`. Climate and lock indicators require no additional API calls or permissions beyond the existing vehicle-data access. Saved climate fields are limited to the keeper mode, on/off state, inside/outside temperatures, both front temperature settings and the vehicle's available temperature limits; the saved vehicle fields are `locked` and `sentry_mode`. Each section keeps its own reading timestamp. Clima and Sentry actions use the existing `vehicle_cmds` scope and paired signing key, where required. See [Tesla's documented commands](https://developer.tesla.com/docs/fleet-api/endpoints/vehicle-commands).
+
+When Location is enabled and authorized, the same request also includes `location_data`; the coordinates arrive in `drive_state`. Only latitude, longitude, their timestamp and the matching reverse-geocoded address are saved. Missing or denied location access does not block battery or climate data. Address lookup runs only when needed, at most once per minute; it has an eight-second deadline and no background daemon. The Apple Maps link uses coordinates rather than searching by address.
 
 Browser sign-in starts a temporary HTTP listener on the Mac's loopback interface, using the configured callback port. It closes when sign-in completes or times out. Later refreshes renew tokens as needed without opening a browser. The public HTTPS site serves only the **public key**: it does not relay the callback, run the plugin or store credentials.
 
@@ -110,6 +121,7 @@ Choose **Settings…** in the plugin menu to open the interactive Terminal promp
 | Client ID, domain, region and callback | **Settings…** writes `client_id`, `domain`, `region` and `redirect_uri` to `config.json`. Region defaults to `eu` (`na` and `cn` are also supported); the default callback is `http://localhost:8765/callback`. |
 | Client Secret and account access | **Settings…** saves the secret in Keychain. **Connect Tesla account…** obtains the access and refresh tokens; renewal is automatic while authorization remains valid. |
 | Vehicle | **Select vehicle** appears for multiple vehicles and saves the selected `vin` in `config.json`. |
+| Location | **Location → Enable Location…** sets `location_enabled` to `true` and requests `vehicle_location` consent. This shares vehicle coordinates with Apple to find an address. Default is disabled. **Disable Location** stops collection and clears the saved location/address; revoke the Tesla grant separately if desired. |
 | Range or percentage | **Menu bar display** saves `display_mode` as `range` (default) or `percent`. This is a local choice, independent of the Tesla mobile app's display preference. |
 | Refresh interval | Managed by xBar's plugin filename: `tesla-battery.1m.sh` runs every minute; `tesla-battery.5m.sh` runs every five minutes. Change it through xBar's plugin management. There is no separate interval in `config.json`. |
 
@@ -134,7 +146,7 @@ The public project contains code, tests and demonstration graphics. Private conf
 ~/Library/Application Support/Tesla xBar/
 ```
 
-OAuth tokens and Client Secret use macOS Keychain. Signing keys are generated outside the checkout, and private files use restricted permissions. Each user has their own Tesla registration and keys. No analytics or vehicle location is collected by the plugin.
+OAuth tokens and Client Secret use macOS Keychain. Signing keys are generated outside the checkout, and private files use restricted permissions. Each user has their own Tesla registration and keys. No analytics is collected. Location is disabled by default. If enabled, the latest vehicle coordinates and address are kept in the private profile (including the rendered menu snapshot), not a travel history. Coordinates are sent to Apple for address lookup and when opening the map; Tesla tokens, VIN and account details are not sent to Apple. The project maintainer receives none of this data.
 
 The temporary OAuth callback runs only on localhost. Signed command tokens travel through stdin rather than process arguments or temporary files. Physical commands are bound to the vehicle displayed in the menu. Concurrent manual actions are rejected with a visible notice instead of queued.
 
@@ -145,12 +157,13 @@ GitHub checks include **CodeQL for Python and Swift, Gitleaks, a privacy scan, D
 - Offline is not proof of sleep. An HTTP 408 is treated as unavailable. The menu distinguishes confirmed sleep from offline status. Both keep green text when the last known cable state is connected, and use muted gray otherwise.
 - Green can reflect a saved cable connection. A disconnection cannot be reflected until new vehicle data is received; the menu labels the saved state as **Last known cable state**. Only confirmed live charging gets a lightning symbol.
 - An offline/asleep reading can be old. The plugin keeps it and shows its timestamp; it never fabricates a fresh value.
-- Climate and unlock icons require an online vehicle, a successful refresh and a section timestamp less than 30 minutes old. They disappear for offline/asleep states, failed refreshes or stale data; saved status text in the menu is then labeled **Last known**. Missing fields do not imply that climate is on or the car is unlocked. Icons reflect the last successful poll, not a push connection to the car.
+- Climate, unlock and Sentry icons require an online vehicle, a successful refresh and a section timestamp less than 30 minutes old. They disappear for offline/asleep states, failed refreshes or stale data; saved status text in the menu is then labeled **Last known**. Missing fields do not imply that climate is on or the car is unlocked. Icons reflect the last successful poll, not a push connection to the car.
+- An address is the closest postal address returned by Apple, not a guarantee of the exact parking bay or house number. If lookup fails, the coordinate-based map link remains available. Tesla may show a location-sharing indicator in the vehicle while location is being requested.
 - Range is never estimated from battery percentage. API miles are converted to kilometers only when required by the vehicle's units.
 - Range/percentage selection is local. Automatic synchronization with the Tesla mobile app's display preference is not implemented.
 - Smooth green pulsing is not implemented; charging uses a static green label and lightning icon.
 - Avoiding wake commands does not guarantee that frequent live data reads cannot delay an already awake vehicle's sleep. Tesla recommends Fleet Telemetry for ongoing data needs; this local plugin uses polling. See [Tesla's API best practices](https://developer.tesla.com/docs/fleet-api/getting-started/best-practices).
-- Signed charging and climate commands may require pairing the app key in the Tesla mobile app. Charging schedules, current and charge limit are not changed by the plugin. Turning climate and modes off does not change Cabin Overheat Protection or scheduled preconditioning settings.
+- Signed charging, climate and Sentry commands may require pairing the app key in the Tesla mobile app. Charging schedules, current and charge limit are not changed by the plugin. Turning climate and modes off does not change Cabin Overheat Protection or scheduled preconditioning settings.
 - **Command accepted** is not the same as confirmed physical state. Confirmation appears only after a subsequent vehicle data read verifies the change.
 - A climate transition can involve two commands. If only the first succeeds, the menu reports partial acceptance and refreshes the state; it does not retry the failed command automatically.
 
@@ -163,7 +176,7 @@ python3 -m scripts.install
 
 For runtime and icon updates with unchanged helpers, use `python3 -m scripts.install --runtime-only`. Change intervals through xBar's plugin management so the running app picks up the new filename.
 
-**The Clima controls update requires a full installation** (`python3 -m scripts.install`) to build the new climate-keeper adapter. Runtime-only installation does not rebuild an older command helper.
+**The Sentry/Location update requires a full installation** (`python3 -m scripts.install`) to build the new Apple geocoding helper. This also builds the climate-keeper adapter. Runtime-only installation requires all helpers to be installed already.
 
 ## Development
 

@@ -1,7 +1,7 @@
 # Status icons
 
 Editable SVG artwork and prebuilt Retina PNG template images for charging, Camp
-Mode, Pet Mode, running climate, and an unlocked vehicle. The 23 PNG strips cover every
+Mode, Pet Mode, running climate, an unlocked vehicle, and Sentry Mode. The 47 PNG strips cover every
 valid combination (Camp and Pet Mode are mutually exclusive).
 
 xBar places all icons, including the charging bolt, in the same monochrome strip

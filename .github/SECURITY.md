@@ -27,3 +27,5 @@ Swift scanning uses a fixed Xcode 16.4 toolchain on an Intel macOS runner, while
 GitHub secret scanning and push protection provide additional checks for supported secret patterns. These checks complement review; they cannot establish the absence of all vulnerabilities or personal information.
 
 Tests and CI use fake accounts and temporary profiles. Never add real Tesla credentials to GitHub Actions secrets for this project. Do not use `pull_request_target` to execute contributor code with privileged tokens.
+
+Optional Location access saves only the latest coordinates, address and timestamps in the private profile. Apple receives coordinates for reverse geocoding and map opening; it never receives Tesla credentials or VIN. Location is disabled by default. Disabling it clears location from the cache and display snapshot. Do not post either file in issues. The `tesla-location` Swift helper is included in CodeQL and macOS builds.

@@ -25,3 +25,5 @@ These automated tests do not replace testing menu interactions in the real xBar 
 `python3 -m scripts.build_commands` also runs the Go adapter tests from
 [`src/commands/climate_test.go`](../src/commands/climate_test.go) in the pinned SDK
 package using the build overlay. They never connect to a vehicle.
+
+`test_sentry_location.py` covers Sentry authorization, signed/legacy command mapping, menu dispatch, active-state freshness, opt-in GPS access, revoked scopes, stale/moved locations, address failures and disabling location. No vehicle or geocoding service is contacted.
