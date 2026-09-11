@@ -11,6 +11,8 @@ online reading, like the other vehicle-state icons; unavailable or stale reading
 remain text in **Locks and trunks** instead. Open includes an unlatched/ajar lid.
 Their shapes follow the Tesla app's front/rear body-section symbols: a single
 wheel with a raised hood or rear lid, adapted to the existing 16-point line style.
+The unlocked padlock also follows the Tesla app reference, with its open shackle
+offset to the left of the solid rounded lock body.
 
 xBar places all icons, including the charging bolt, in the same monochrome strip
 before the range or percentage. macOS chooses
@@ -20,6 +22,6 @@ the PNG carries 144 DPI density for its 32-pixel Retina representation.
 The installer copies the PNGs into the private profile's `icons/` directory.
 Python reads the matching strip directly; there is no rendering process or
 additional dependency when the plugin runs. SVG sources are editable project
-artwork; the trunk symbols are redrawn from the Tesla app reference, not extracted
+artwork; the unlock and trunk symbols are redrawn from the Tesla app reference, not extracted
 from a personal screenshot. Regenerate them with
 [`scripts/render_status_icons.cjs`](../../scripts/render_status_icons.cjs).
