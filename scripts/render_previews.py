@@ -31,8 +31,8 @@ bar += '<rect x="8" y="8" width="237" height="50" rx="22" fill="#ffffff" fill-op
 bar += bolt(24, 18, 1.7) + text(67, 44, '360 km', 30, '#32cd66')
 (OUT / 'menu-bar.svg').write_text(svg(320, 66, bar))
 
-body = '<rect width="600" height="1183" rx="22" fill="url(#blue)"/>'
-body += '<rect x="4" y="4" width="592" height="1175" rx="18" fill="url(#panel)" stroke="#8fa3af" stroke-opacity="0.5"/>'
+body = '<rect width="600" height="1234" rx="22" fill="url(#blue)"/>'
+body += '<rect x="4" y="4" width="592" height="1226" rx="18" fill="url(#panel)" stroke="#8fa3af" stroke-opacity="0.5"/>'
 body += text(27, 47, 'Tesla', 27, '#dce4eb', 600)
 rows = ['Battery: 73 %', 'Tesla range: 360 km', 'Charge limit: 80 %', 'Cable: connected',
         'Charging', 'Power: 11 kW', 'Time to charge limit: 0 h 30 min', 'Battery reading from 12 Jul 09:41']
@@ -43,19 +43,34 @@ def divider(y):
     return f'<path d="M27 {y}H573" stroke="#95a7b1" stroke-opacity="0.3"/>'
 
 body += divider(440)
-for y, label, sub in [(486, 'Charging and port', True), (537, 'Clima', True), (588, 'Sentry', True), (639, 'Location', True), (706, 'Refresh now', False),
-                      (753, 'Wake vehicle and refresh', False), (800, 'Connect Tesla account…', False),
-                      (847, 'Settings…', False), (894, 'Menu bar display', True)]:
+for y, label, sub in [(486, 'Charging and port', True), (537, 'Locks and trunks', True), (588, 'Clima', True),
+                      (639, 'Sentry', True), (690, 'Location', True), (757, 'Refresh now', False),
+                      (804, 'Wake vehicle and refresh', False), (851, 'Connect Tesla account…', False),
+                      (898, 'Settings…', False), (945, 'Menu bar display', True)]:
     body += text(27, y, label, 25)
     if sub:
         body += f'<path d="m562 {y-17} 7 7-7 7" fill="none" stroke="#e5e9ed" stroke-width="2.5"/>'
-body += divider(664) + divider(927)
-body += text(27, 970, 'Refresh interval managed by xBar', 23, '#aebdc8')
-body += text(27, 1017, 'Tesla Developer', 25)
-body += text(27, 1064, 'Manage Tesla permissions', 25)
-body += divider(1097) + text(27, 1142, 'xbar', 25)
-body += '<path d="m562 1125 7 7-7 7" fill="none" stroke="#e5e9ed" stroke-width="2.5"/>'
-(OUT / 'menu.svg').write_text(svg(600, 1183, body))
+body += divider(715) + divider(978)
+body += text(27, 1021, 'Refresh interval managed by xBar', 23, '#aebdc8')
+body += text(27, 1068, 'Tesla Developer', 25)
+body += text(27, 1115, 'Manage Tesla permissions', 25)
+body += divider(1148) + text(27, 1193, 'xbar', 25)
+body += '<path d="m562 1176 7 7-7 7" fill="none" stroke="#e5e9ed" stroke-width="2.5"/>'
+(OUT / 'menu.svg').write_text(svg(600, 1234, body))
+
+body = '<rect width="600" height="514" rx="18" fill="#202932"/>'
+body += text(28, 42, 'Locks and trunks', 25, weight=600)
+for y, label in [(88, 'Vehicle lock: locked'), (124, 'Front trunk: closed'), (160, 'Rear trunk: closed')]:
+    body += text(28, y, label, 22, '#a0a6ad')
+body += divider(185)
+for y, label in [(228, 'Lock vehicle'), (275, 'Unlock vehicle')]:
+    body += text(28, y, label, 24)
+body += divider(305)
+for y, label in [(348, 'Open front trunk'), (395, 'Open / close rear trunk')]:
+    body += text(28, y, label, 24)
+body += text(28, 446, 'Rear trunk closing depends on vehicle support.', 21, '#a0a6ad')
+body += text(28, 486, 'Illustrative data', 17, '#a0a6ad')
+(OUT / 'locks-trunks.svg').write_text(svg(600, 514, body))
 
 body = '<rect width="1326" height="380" rx="20" fill="#111c29"/>'
 examples = [('Charging', '360 km', '#32cd66', 'bolt'), ('Connected · paused', '360 km', '#32cd66', ''),
@@ -105,4 +120,4 @@ body += text(488, 824, 'Disable Location', 24)
 body += text(40, 797, 'Public landmark example', 18, '#a0a6ad')
 body += text(40, 833, 'No personal location data', 18, '#a0a6ad')
 (OUT / 'sentry-location.svg').write_text(svg(1080, 900, body))
-print('Created five SVG previews using fictional data only.')
+print('Created six SVG previews using fictional data and a public landmark map.')

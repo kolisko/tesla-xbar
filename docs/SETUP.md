@@ -97,6 +97,16 @@ Choose **Charging and port → Add key to vehicle…**, open the link on a phone
 
 Test physical commands yourself when appropriate. **Start charging**, **Stop charging** and port actions can wake the vehicle. Ordinary **Refresh now** does not send wake commands. Opening a port is not a physical cable-removal mechanism.
 
+The **Locks and trunks** submenu groups **Lock vehicle**, **Unlock vehicle**,
+**Open front trunk** and **Open / close rear trunk**. It uses the same Vehicle
+Commands permission and paired key as Clima and Sentry, with no extra setup.
+These explicit actions may wake the car. Rear-trunk opening/closing is one toggle
+according to the vehicle's position; closing requires support from the vehicle.
+The front trunk has no remote close action. Lock and trunk readings come from the
+normal vehicle-data request and remain labeled **Last known** while unavailable.
+After a click, the plugin distinguishes command acceptance from confirmation by
+a new reading. A trunk marked open may be ajar rather than fully raised.
+
 ## Updating
 
 ```sh

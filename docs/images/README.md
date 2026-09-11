@@ -9,6 +9,7 @@ These illustrations show the plugin's appearance using fictional data and a neut
 | [`states.svg`](states.svg), [`states.png`](states.png) | Eight examples: charging, connected, low range, and asleep/offline with either a last known connected cable (green) or unplugged cable (normal range color). Offline/asleep readings have a small trailing dot and no active status icons. |
 | [`status-icons.svg`](status-icons.svg), [`status-icons.png`](status-icons.png) | Matching charging, Camp Mode, Pet Mode, climate fan and open padlock icons, plus a combined menu-bar example. |
 | [`clima.svg`](clima.svg), [`clima.png`](clima.png) | Clima controls for modes, temperature and shutdown. |
+| [`locks-trunks.svg`](locks-trunks.svg), [`locks-trunks.png`](locks-trunks.png) | Combined lock/unlock and front/rear trunk controls with illustrative state readings. |
 
 [`scripts/render_status_icons.cjs`](../../scripts/render_status_icons.cjs) generates
 the status-icons preview together with the runtime PNG assets. Its optional

@@ -4,7 +4,7 @@
 [![CodeQL](https://github.com/kolisko/tesla-xbar/actions/workflows/codeql.yml/badge.svg)](https://github.com/kolisko/tesla-xbar/actions/workflows/codeql.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-Your Tesla's battery range or percentage in the macOS menu bar, powered by the official Fleet API. Built for [xBar](https://xbarapp.com/), with English menus, local credential storage and explicit charging, climate and Sentry controls.
+Your Tesla's battery range or percentage in the macOS menu bar, powered by the official Fleet API. Built for [xBar](https://xbarapp.com/), with English menus, local credential storage and charging, lock, trunk, climate and Sentry controls.
 
 <img src="docs/images/menu-bar.png" alt="Menu bar preview: monochrome lightning icon before a green 360 km label" width="320">
 
@@ -24,6 +24,10 @@ Open **Clima** to see inside and outside temperatures, change climate modes, tur
 
 <img src="docs/images/clima.png" alt="Clima submenu with Keep, Camp and Pet modes, temperature selection and full shutdown" width="420">
 
+Open **Locks and trunks** to lock/unlock the vehicle, open the front trunk or open/close the rear trunk. Rear trunk closing depends on the vehicle; there is no front-trunk close command.
+
+<img src="docs/images/locks-trunks.png" alt="Locks and trunks submenu with vehicle lock and trunk status, lock/unlock actions, front trunk opening and rear trunk toggle" width="460">
+
 Open **Sentry** for on/off controls and **Location** for the address, optional map preview and Apple Maps link.
 
 <img src="docs/images/sentry-location.png" alt="Sentry controls and Location with a MapMap preview, blue vehicle dot, example Times Square address, timestamp and Apple Maps link" width="960">
@@ -39,6 +43,7 @@ Open **Sentry** for on/off controls and **Location** for the address, optional m
 - **Explicit commands:** wake and refresh, start/stop charging, open/close the charge port, and climate controls. Normal refresh never sends a wake or climate command.
 - **Clima submenu:** normal climate, Keep Climate On, Camp Mode, Pet Mode, temperature selection in 0.5 °C steps, modes off, and full climate/modes off. Temperature choices use the limits reported by the vehicle and set both front zones; changing the target alone does not turn climate on. Normal climate and full shutdown exit an active keeper mode first. Clicked actions can wake an unavailable vehicle before sending the command.
 - **Sentry submenu:** turn Sentry on or off using the existing Vehicle Commands permission. The active icon uses the same size, monochrome tint and placement as the other indicators.
+- **Locks and trunks submenu:** lock/unlock the vehicle, open the front trunk and toggle the rear trunk, with current or last-known lock and trunk readings. Actions use the existing Vehicle Commands permission and signing key. A rear-trunk toggle follows the vehicle's current position; it is never retried automatically after an uncertain result. Rear closing requires vehicle support.
 - **Location submenu (optional):** address, reading time, a MapMap preview with a blue vehicle dot and no POI pins, and an Apple Maps link. Requires Vehicle Location consent; map sharing is separately enabled and needs no map API key. Offline data is explicitly labeled as last known.
 - **Private profiles:** tokens and Client Secret in Keychain; configuration, signing key and cached readings in the current user's Application Support directory.
 - **Updates preserve your setup:** existing keys, credentials, readings and xBar interval remain intact.
@@ -78,7 +83,7 @@ flowchart TD
 
 A normal refresh checks vehicle availability and reads live data when available; otherwise it retains the last known reading. Wake is a separate, explicit action. The Python application sends ordinary API requests itself and delegates commands requiring signatures to the Go helper.
 
-The same `vehicle_data` request includes `charge_state`, `gui_settings`, `climate_state` and `vehicle_state`. Climate and lock indicators require no additional API calls or permissions beyond the existing vehicle-data access. Saved climate fields are limited to the keeper mode, on/off state, inside/outside temperatures, both front temperature settings and the vehicle's available temperature limits; the saved vehicle fields are `locked` and `sentry_mode`. Each section keeps its own reading timestamp. Clima and Sentry actions use the existing `vehicle_cmds` scope and paired signing key, where required. See [Tesla's documented commands](https://developer.tesla.com/docs/fleet-api/endpoints/vehicle-commands).
+The same `vehicle_data` request includes `charge_state`, `gui_settings`, `climate_state` and `vehicle_state`. Climate, lock and trunk readings require no additional API calls or permissions beyond the existing vehicle-data access. Saved climate fields are limited to the keeper mode, on/off state, inside/outside temperatures, both front temperature settings and the vehicle's available temperature limits; the saved vehicle fields are `locked`, `sentry_mode`, `ft` (front trunk) and `rt` (rear trunk). Each section keeps its own reading timestamp. Clima, Sentry, lock and trunk actions use the existing `vehicle_cmds` scope and paired signing key, where required. See [Tesla's documented commands](https://developer.tesla.com/docs/fleet-api/endpoints/vehicle-commands).
 
 When Location is enabled and authorized, the same request also includes `location_data`; the coordinates arrive in `drive_state`. Only latitude, longitude, their timestamp and the matching reverse-geocoded address are saved. Missing or denied location access does not block battery or climate data. Address lookup runs only when needed, at most once per minute; it has an eight-second deadline and no background daemon. The Apple Maps link uses coordinates rather than searching by address.
 
@@ -175,6 +180,7 @@ GitHub checks include **CodeQL for Python and Swift, Gitleaks, a privacy scan, D
 - Signed charging, climate and Sentry commands may require pairing the app key in the Tesla mobile app. Charging schedules, current and charge limit are not changed by the plugin. Turning climate and modes off does not change Cabin Overheat Protection or scheduled preconditioning settings.
 - **Command accepted** is not the same as confirmed physical state. Confirmation appears only after a subsequent vehicle data read verifies the change.
 - A climate transition can involve two commands. If only the first succeeds, the menu reports partial acceptance and refreshes the state; it does not retry the failed command automatically.
+- Lock and trunk actions refresh the state after acceptance. The menu reports vehicle confirmation only when a new reading shows the expected state (or a changed rear-trunk position). Trunk "open" includes an unlatched/ajar reading; it does not prove the lid has finished moving. If the change is not yet visible, the menu keeps **Command accepted** until ordinary refresh updates the readings.
 
 ## Update
 

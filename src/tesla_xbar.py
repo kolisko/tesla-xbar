@@ -51,7 +51,13 @@ VEHICLE_COMMANDS = {
     "climate-set-temp": ("climate-set-temp", "Set temperature", "set_temps"),
     "sentry-on": ("sentry-mode", "Turn Sentry on", "set_sentry_mode"),
     "sentry-off": ("sentry-mode", "Turn Sentry off", "set_sentry_mode"),
+    "door-lock": ("lock", "Lock vehicle", "door_lock"),
+    "door-unlock": ("unlock", "Unlock vehicle", "door_unlock"),
+    "frunk-open": ("frunk-open", "Open front trunk", "actuate_trunk"),
+    "trunk-move": ("trunk-move", "Open / close rear trunk", "actuate_trunk"),
 }
+LOCK_TRUNK_COMMANDS = ("door-lock", "door-unlock", "frunk-open", "trunk-move")
+VEHICLE_SCOPE_PREFIXES = ("climate-", "sentry-", "door-", "frunk-", "trunk-")
 CLIMATE_MODES = {"climate-keep": ("on", 1), "climate-pet": ("dog", 2),
                  "climate-camp": ("camp", 3), "climate-mode-off": ("off", 0)}
 
@@ -257,6 +263,8 @@ class Client:
         elif command.startswith("sentry-"):
             arguments = ["on" if command == "sentry-on" else "off"]
             body = {"on": command == "sentry-on"}
+        elif command in ("frunk-open", "trunk-move"):
+            body = {"which_trunk": "front" if command == "frunk-open" else "rear"}
         if not capabilities["signing_required"]:
             path = "/api/1/vehicles/" + urllib.parse.quote(vin, safe="") + "/command/" + endpoint
             response = self.request(path, body=body).get("response", {})
@@ -328,7 +336,7 @@ def command_error(text, command=""):
     for needles, message in (
         (("has not been paired", "not on whitelist", "unknown key"), "First add the app key to your vehicle using the Tesla mobile app."),
         (("403", "forbidden", "insufficient scope"), "Tesla denied the command. Allow Vehicle Commands via Connect Tesla account."
-         if command.startswith(("climate-", "sentry-")) else "Tesla denied the command. Allow Vehicle Charging Management via Connect Tesla account."),
+         if command.startswith(VEHICLE_SCOPE_PREFIXES) else "Tesla denied the command. Allow Vehicle Charging Management via Connect Tesla account."),
         (("unrecognized command",), "Update the command helper: run python3 -m scripts.install from the project folder."),
         (("401", "unauthorized"), "Your session has expired. Connect your Tesla account again."),
         (("no_power", "no power"), "The charger is not supplying power."),
@@ -419,7 +427,7 @@ def fetch_state(config, client=None):
                 ("climate_state", "climate", ("climate_keeper_mode", "is_climate_on", "driver_temp_setting",
                                               "passenger_temp_setting", "min_avail_temp", "max_avail_temp",
                                               "inside_temp", "outside_temp")),
-                ("vehicle_state", "vehicle_status", ("locked", "sentry_mode")),
+                ("vehicle_state", "vehicle_status", ("locked", "sentry_mode", "ft", "rt")),
             ):
                 data = response.get(source)
                 snapshot = {key: data[key] for key in fields if key in data} if isinstance(data, dict) else {}
@@ -522,7 +530,7 @@ def run_vehicle_command(config, command, client=None, temperature=None):
         report["vin"] = vin
         if command.startswith("charge-") and not capabilities["charging_authorized"]:
             raise AppError("Allow Vehicle Charging Management via Connect Tesla account.")
-        if command.startswith(("climate-", "sentry-")) and not capabilities.get("vehicle_authorized"):
+        if command.startswith(VEHICLE_SCOPE_PREFIXES) and not capabilities.get("vehicle_authorized"):
             raise AppError("Allow Vehicle Commands via Connect Tesla account.")
         if capabilities["signing_required"] and not capabilities["key_paired"]:
             raise AppError("First add the app key to your vehicle using the Tesla mobile app.")
@@ -573,10 +581,14 @@ def run_vehicle_command(config, command, client=None, temperature=None):
                       and fresh["vehicle_status"].get("updated_at", 0) >= sent_at
                       and fresh["vehicle_status"].get("sentry_mode") is (command == "sentry-on")):
                     message = label + " • confirmed by the vehicle."
+                elif command in LOCK_TRUNK_COMMANDS:
+                    confirmed = lock_trunk_confirmation(fresh, cache, command, sent_at)
+                    if confirmed:
+                        message = confirmed + " • confirmed by the vehicle."
         report.update(status="success", message=message)
     except (AppError, OSError, subprocess.SubprocessError) as exc:
         message = str(exc) if isinstance(exc, AppError) else "The command could not be completed."
-        if isinstance(exc, APIError) and exc.status == 403 and command.startswith(("climate-", "sentry-")):
+        if isinstance(exc, APIError) and exc.status == 403 and command.startswith(VEHICLE_SCOPE_PREFIXES):
             message = "Tesla denied the command. Allow Vehicle Commands via Connect Tesla account."
         if accepted:
             message = "Some commands were accepted; " + message
@@ -604,6 +616,31 @@ def climate_command_confirmed(cache, command, temperature, sent_at):
         return all(number(climate.get(key)) and abs(climate[key] - temperature) < 0.1
                    for key in ("driver_temp_setting", "passenger_temp_setting"))
     return False
+
+
+def trunk_open_state(vehicle_status, field):
+    value = vehicle_status.get(field)
+    # Tesla closure readings use zero for closed and nonzero for open/ajar.
+    if isinstance(value, int) and not isinstance(value, bool) and 0 <= value <= 255:
+        return value != 0
+    return None
+
+
+def lock_trunk_confirmation(fresh, before, command, sent_at):
+    status = fresh.get("vehicle_status") or {}
+    if not status_is_current(fresh, "vehicle_status") or status.get("updated_at", 0) < sent_at:
+        return None
+    if command.startswith("door-") and status.get("locked") is (command == "door-lock"):
+        return "Vehicle locked" if command == "door-lock" else "Vehicle unlocked"
+    if command == "frunk-open" and trunk_open_state(status, "ft") is True:
+        return "Front trunk open"
+    if command == "trunk-move" and status_is_current(before, "vehicle_status"):
+        previous = trunk_open_state(before.get("vehicle_status") or {}, "rt")
+        current = trunk_open_state(status, "rt")
+        # A toggle acknowledgement alone does not tell us the resulting position.
+        if previous is not None and current is not None and previous != current:
+            return "Rear trunk open" if current else "Rear trunk closed"
+    return None
 
 
 def pinned_vehicle_config(config, menu_vin=None):
@@ -742,6 +779,27 @@ def sentry_menu(cache, vehicle_action):
         checked = current and state is (command == "sentry-on")
         label = ("✓ " if checked else "") + VEHICLE_COMMANDS[command][1]
         lines.append("--" + vehicle_action(label, "command", command))
+    return lines
+
+
+def locks_trunks_menu(cache, vehicle_action):
+    status = cache.get("vehicle_status") or {}
+    current = status_is_current(cache, "vehicle_status")
+    locked = status.get("locked")
+    lock_state = ("locked" if locked else "unlocked") if isinstance(locked, bool) else "unavailable"
+    label = "Vehicle lock" if current else "Last known vehicle lock"
+    lines = ["Locks and trunks", f"--{label}: {lock_state} | color=gray"]
+    for field, label in (("ft", "Front trunk"), ("rt", "Rear trunk")):
+        opened = trunk_open_state(status, field)
+        value = ("open" if opened else "closed") if opened is not None else "unavailable"
+        label = label if current else "Last known " + label.lower()
+        lines.append(f"--{label}: {value} | color=gray")
+    lines.append("-----")
+    for command in LOCK_TRUNK_COMMANDS:
+        if command == "frunk-open":
+            lines.append("-----")
+        lines.append("--" + vehicle_action(VEHICLE_COMMANDS[command][1], "command", command))
+    lines.append("--Rear trunk closing depends on vehicle support. | color=gray")
     return lines
 
 
@@ -1086,6 +1144,7 @@ def render(cache, config, demo=False):
     if domain and "/" not in domain and ":" not in domain:
         lines.append("--Add key to vehicle… | href=https://www.tesla.com/_ak/" + domain)
     lines.append("--" + vehicle_action("Check command setup", "command-setup"))
+    lines.extend(locks_trunks_menu(cache, vehicle_action))
     lines.extend(clima_menu(cache, vehicle_action))
     lines.extend(sentry_menu(cache, vehicle_action))
     lines.extend(location_menu(cache, config))

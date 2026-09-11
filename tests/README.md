@@ -6,6 +6,7 @@ These tests use fake Tesla clients and temporary local profiles. They do not req
 | --- | --- |
 | [`test_tesla_xbar.py`](test_tesla_xbar.py) | Refresh behavior, token renewal, range and percentage display, colors, cached readings and manual wake. |
 | [`test_commands.py`](test_commands.py) | Charging and port commands, required permissions, signed command handling and target validation. |
+| [`test_locks_trunks.py`](test_locks_trunks.py) | Grouped lock/trunk menu, signed and legacy commands, scoped access, vehicle binding, cached closure readings, one-shot toggles and acknowledgement versus observed state. |
 | [`test_reliability.py`](test_reliability.py) | Offline/asleep states, rate-limit responses, concurrent actions and vehicle selection. |
 | [`test_install.py`](test_install.py) | Installation, generated launchers, private-key handling and preservation of profiles, helpers and refresh intervals. |
 | [`test_status_icons.py`](test_status_icons.py) | Camp/Pet/climate/unlock field selection, section freshness, partial responses, offline behavior and prebuilt menu-bar image combinations. |
