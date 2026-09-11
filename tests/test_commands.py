@@ -114,7 +114,7 @@ class CommandsTests(unittest.TestCase):
     def test_only_allowlisted_commands(self):
         client = CommandClient()
         with self.assertRaises(app.AppError):
-            app.run_vehicle_command(self.config, "door-unlock", client)
+            app.run_vehicle_command(self.config, "remote-drive", client)
         self.assertEqual(client.calls, [])
 
     def test_signed_command_token_uses_stdin_and_errors_are_redacted(self):

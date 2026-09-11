@@ -46,7 +46,7 @@ Create your application in the [Tesla Developer portal](https://developer.tesla.
 | Grant types | Authorization Code and Client Credentials / Machine-to-Machine |
 | Vehicle access | Vehicle Information, Vehicle Commands, Vehicle Charging Management |
 
-The plugin requests `openid offline_access vehicle_device_data vehicle_cmds vehicle_charging_cmds`. The current version requests command scopes as well as read access because it includes wake and charging controls. Location is optional: enable **Vehicle Location** for the developer app, then choose **Location → Enable Location…** and approve that scope on Tesla’s consent page. This adds `vehicle_location`. No energy-product scopes are requested. Tesla's charging scope may cover more information than this plugin uses; inspect Tesla's consent page before granting access.
+The plugin requests `openid offline_access vehicle_device_data vehicle_cmds vehicle_charging_cmds`. Command scopes cover the explicit wake, charging, climate, Sentry, lock and trunk controls. Location is optional: enable **Vehicle Location** for the developer app, then choose **Location → Enable Location…** and approve that scope on Tesla’s consent page. This adds `vehicle_location`. No energy-product scopes are requested. Tesla's charging scope may cover more information than this plugin uses; inspect Tesla's consent page before granting access.
 
 Complete any required app review and billing setup in the portal. Keep your Client Secret private. See [Tesla's authentication guide](https://developer.tesla.com/docs/fleet-api/authentication/overview) and [billing documentation](https://developer.tesla.com/docs/fleet-api/billing-and-limits).
 
@@ -69,13 +69,15 @@ If you have multiple vehicles, choose **Select vehicle** in the menu. **Menu bar
 
 Reading battery data does not require adding a virtual key to the vehicle. Many vehicles require the app's key for signed charging and charge-port commands.
 
-Camp Mode, Pet Mode, running climate and unlocked-vehicle indicators use the same
-vehicle-data permission as battery readings. They need no additional consent or
-virtual-key pairing. After updating, they appear when the next successful online
-refresh supplies the relevant fields. The fan means `is_climate_on` is true;
-an open padlock means `locked` is explicitly false. Missing or old information
-does not activate an icon. Climate controls are available separately under **Clima**;
-the unlock indicator does not add lock/unlock controls.
+Camp Mode, Pet Mode, running climate, unlocked-vehicle, Sentry and front/rear trunk
+indicators use the same vehicle-data permission as battery readings. They need no
+additional consent or virtual-key pairing. After updating, they appear when the
+next successful online refresh supplies the relevant fields. The fan means
+`is_climate_on` is true; an open padlock means `locked` is explicitly false.
+Front/rear trunk icons use their own closure readings and may appear regardless
+of the lock state. Missing, offline/asleep or old information does not activate
+an icon. Controls are grouped under **Clima**, **Sentry** and **Locks and trunks**;
+using these actions requires the command permissions described below.
 
 The **Clima** submenu provides normal climate, Keep Climate On, Camp Mode, Pet Mode,
 temperature selection, modes off and full climate/modes off. These actions use
@@ -97,6 +99,16 @@ Choose **Charging and port → Add key to vehicle…**, open the link on a phone
 
 Test physical commands yourself when appropriate. **Start charging**, **Stop charging** and port actions can wake the vehicle. Ordinary **Refresh now** does not send wake commands. Opening a port is not a physical cable-removal mechanism.
 
+The **Locks and trunks** submenu groups **Lock vehicle**, **Unlock vehicle**,
+**Open front trunk** and **Open / close rear trunk**. It uses the same Vehicle
+Commands permission and paired key as Clima and Sentry, with no extra setup.
+These explicit actions may wake the car. Rear-trunk opening/closing is one toggle
+according to the vehicle's position; closing requires support from the vehicle.
+The front trunk has no remote close action. Lock and trunk readings come from the
+normal vehicle-data request and remain labeled **Last known** while unavailable.
+After a click, the plugin distinguishes command acceptance from confirmation by
+a new reading. A trunk marked open may be ajar rather than fully raised.
+
 ## Updating
 
 ```sh
@@ -104,7 +116,7 @@ git pull --ff-only
 python3 -m scripts.install
 ```
 
-For an update that only changes Python code or the wrapper, you can reuse installed helpers:
+For an update that only changes Python code, icons or the wrapper, you can reuse installed helpers:
 
 ```sh
 python3 -m scripts.install --runtime-only

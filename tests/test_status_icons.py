@@ -143,8 +143,10 @@ class StatusIconTests(unittest.TestCase):
         combinations = []
         for charging, mode in itertools.product((False, True), (None, "camp", "pet")):
             for fan in (False, True):
-                for unlocked, sentry in itertools.product((False, True), repeat=2):
-                    names = [name for name in ("charging" if charging else None, mode, "fan" if fan else None, "unlocked" if unlocked else None, "sentry" if sentry else None) if name]
+                for unlocked, sentry, frunk, trunk in itertools.product((False, True), repeat=4):
+                    names = [name for name in ("charging" if charging else None, mode, "fan" if fan else None,
+                             "unlocked" if unlocked else None, "sentry" if sentry else None,
+                             "frunk" if frunk else None, "trunk" if trunk else None) if name]
                     if not names:
                         continue
                     combinations.append(names)
@@ -159,8 +161,56 @@ class StatusIconTests(unittest.TestCase):
                             chunks[png[offset + 4:offset + 8]] = png[offset + 8:offset + 8 + length]
                             offset += length + 12
                         self.assertEqual(struct.unpack(">IIB", chunks[b"pHYs"]), (5669, 5669, 1))
-        self.assertEqual(len(combinations), 47)
+        self.assertEqual(len(combinations), 191)
         self.assertEqual(app.status_icon_image(["camp", "pet"]), "")
+
+    def test_trunk_icons_are_independent_of_lock_state_and_each_other(self):
+        for locked in (True, False, None):
+            for front, rear, expected in ((0, 0, []), (1, 0, ["frunk"]),
+                                           (0, 255, ["trunk"]), (255, 255, ["frunk", "trunk"])):
+                cache = self.cache("off", False, locked)
+                cache["vehicle_status"].update(ft=front, rt=rear)
+                self.assertEqual(app.active_status_icons(cache),
+                                 (["unlocked"] if locked is False else []) + expected)
+        for value in (None, True, False, -1, 256, "255", [], {}, 1.5):
+            cache = self.cache("off", False, True)
+            cache["vehicle_status"].update(ft=value, rt=255)
+            self.assertEqual(app.active_status_icons(cache), ["trunk"])
+            cache["vehicle_status"].update(ft=255, rt=value)
+            self.assertEqual(app.active_status_icons(cache), ["frunk"])
+
+    def test_trunk_icons_hide_when_unavailable_but_keep_last_known_details(self):
+        cache = self.cache("off", False, True)
+        cache["vehicle_status"].update(ft=255, rt=255)
+        for changes in ({"state": "asleep"}, {"state": "offline"}, {"state": "unknown"},
+                        {"error": "Network unavailable"}):
+            changed = cache | changes
+            menu = app.render(changed, self.config)
+            self.assertEqual(app.active_status_icons(changed), [])
+            self.assertNotIn("templateImage=", menu.splitlines()[0])
+            self.assertTrue(menu.startswith("360 km"))
+            self.assertIn("--Last known front trunk: open", menu)
+            self.assertIn("--Last known rear trunk: open", menu)
+        for timestamp in (None, self.now - app.STALE_AFTER_SECONDS, self.now + 60):
+            cache["vehicle_status"]["updated_at"] = timestamp
+            self.assertEqual(app.active_status_icons(cache), [])
+
+    def test_shared_read_populates_trunk_icons_and_missing_fields_clear_them(self):
+        client = StatusClient({"vehicle_state": {"locked": True, "ft": 255, "rt": 255,
+                                                "timestamp": self.now * 1000}})
+        cache = app.fetch_state(self.config, client)
+        self.assertEqual(len(client.calls), 2)
+        self.assertEqual(app.active_status_icons(cache), ["charging", "frunk", "trunk"])
+        for mode in ("range", "percent"):
+            menu = app.render(cache, self.config | {"display_mode": mode})
+            image = menu.splitlines()[0].split("templateImage=")[1]
+            self.assertEqual(base64.b64decode(image),
+                             (app.HERE / "icons/charging-frunk-trunk.png").read_bytes())
+        client.sections["vehicle_state"] = {"locked": True, "ft": 0, "timestamp": self.now * 1000}
+        cache = app.fetch_state(self.config, client)
+        self.assertEqual(app.active_status_icons(cache), ["charging"])
+        self.assertIn("--Front trunk: closed", app.render(cache, self.config))
+        self.assertIn("--Rear trunk: unavailable", app.render(cache, self.config))
 
     def test_missing_asset_keeps_textual_status_available(self):
         with patch.object(app, "HERE", app.APP_DIR):

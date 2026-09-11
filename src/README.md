@@ -8,7 +8,7 @@ This directory contains the code installed on the user's Mac.
 | [`keychain.swift`](keychain.swift) | Source for the `tesla-keychain` executable. Reads and writes credentials in macOS Keychain using JSON over stdin and stdout. |
 | [`location.swift`](location.swift) | Source for `tesla-location`: bounded Apple reverse geocoding of coordinates received over stdin. No Tesla secrets or Mac location access. |
 | [`map_image.swift`](map_image.swift) | Source for `tesla-map-image`: local AppKit composition of a blue vehicle dot on MapMap image bytes, returning a 144 DPI PNG. No network or Mac GPS access. |
-| [`icons/`](icons/README.md) | Editable SVG sources and prebuilt PNG strips for charging, climate, unlock and Sentry indicators. |
+| [`icons/`](icons/README.md) | Editable SVG sources and prebuilt PNG strips for charging, climate, unlock, Sentry and front/rear trunk indicators. |
 | [`commands/`](commands/README.md) | Small Go adapter and tests that expose climate-keeper modes through the pinned Tesla command helper. |
 | [`__init__.py`](__init__.py) | Allows tests to import the runtime from the checkout. |
 

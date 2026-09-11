@@ -4,7 +4,7 @@
 [![CodeQL](https://github.com/kolisko/tesla-xbar/actions/workflows/codeql.yml/badge.svg)](https://github.com/kolisko/tesla-xbar/actions/workflows/codeql.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-Your Tesla's battery range or percentage in the macOS menu bar, powered by the official Fleet API. Built for [xBar](https://xbarapp.com/), with English menus, local credential storage and explicit charging, climate and Sentry controls.
+Your Tesla's battery range or percentage in the macOS menu bar, powered by the official Fleet API. Built for [xBar](https://xbarapp.com/), with English menus, local credential storage and charging, lock, trunk, climate and Sentry controls.
 
 <img src="docs/images/menu-bar.png" alt="Menu bar preview: monochrome lightning icon before a green 360 km label" width="320">
 
@@ -18,11 +18,15 @@ Open the menu to see battery percentage, Tesla's range, charge limit, cable conn
 
 <img src="docs/images/states.png" alt="Eight display examples: charging, connected but paused, orange and red low range, and asleep or offline with a last known connected or unplugged cable" width="1000">
 
-<img src="docs/images/status-icons.png" alt="Matching monochrome charging bolt, Camp Mode tent, Pet Mode paw, climate fan, unlocked padlock and Sentry symbol before the range" width="940">
+<img src="docs/images/status-icons.png" alt="Matching monochrome charging, Camp, Pet, fan, unlock, Sentry and open front/rear trunk icons before the range" width="940">
 
 Open **Clima** to see inside and outside temperatures, change climate modes, turn climate on or off, or set the target temperature for both front zones. Measured temperatures are shown separately from **Target temperature**.
 
 <img src="docs/images/clima.png" alt="Clima submenu with Keep, Camp and Pet modes, temperature selection and full shutdown" width="420">
+
+Open **Locks and trunks** to lock/unlock the vehicle, open the front trunk or open/close the rear trunk. Rear trunk closing depends on the vehicle; there is no front-trunk close command.
+
+<img src="docs/images/locks-trunks.png" alt="Locks and trunks submenu with vehicle lock and trunk status, lock/unlock actions, front trunk opening and rear trunk toggle" width="460">
 
 Open **Sentry** for on/off controls and **Location** for the address, optional map preview and Apple Maps link.
 
@@ -32,13 +36,14 @@ Open **Sentry** for on/off controls and **Location** for the address, optional m
 
 - **Range or percentage:** switch through **Menu bar display**. Range comes directly from Tesla's range fields and uses the vehicle's distance units.
 - **Cable and charging status:** green text when connected, including scheduled or paused charging. Fresh online charging adds a monochrome lightning icon before the label, matching the other status icons.
-- **Live vehicle indicators:** a tent for Camp Mode, a paw for Pet Mode, a fan while climate is on, an open padlock when the vehicle is unlocked, and a concentric-circle Sentry symbol when Sentry is on. Active indicators appear together before the range or percentage; their names also appear in the menu.
+- **Live vehicle indicators:** a tent for Camp Mode, a paw for Pet Mode, a fan while climate is on, an open padlock when the vehicle is unlocked, a concentric-circle Sentry symbol when Sentry is on, and separate car silhouettes for an open front or rear trunk. The trunk indicators use their own closure readings independently of the lock state; both can appear together. Active indicators appear together before the range or percentage; their states also appear in the menu.
 - **Low-range colors:** orange below 350 km and red below 300 km when unplugged. Connected cable status takes precedence.
 - **Last known data:** asleep and offline readings keep the saved range or percentage and add a small trailing dot, such as `360 km ·` or `73% ·`. Connection state does not change the text color: a last known connected cable stays green, and unplugged readings keep the normal range colors. Failed or stale readings retain their values and colors too; the dot specifically indicates offline/asleep. The connection state and original reading timestamp stay visible in the menu.
 - **One refresh schedule:** xBar's filename controls polling (`1m`, `5m`, etc.). **Refresh now** uses the same path. No second polling timer or invented monthly quota.
-- **Explicit commands:** wake and refresh, start/stop charging, open/close the charge port, and climate controls. Normal refresh never sends a wake or climate command.
+- **Explicit commands:** wake and refresh, start/stop charging, open/close the charge port, climate and Sentry controls, lock/unlock, and front/rear trunk controls. Normal refresh only reads vehicle state and never sends a physical command.
 - **Clima submenu:** normal climate, Keep Climate On, Camp Mode, Pet Mode, temperature selection in 0.5 °C steps, modes off, and full climate/modes off. Temperature choices use the limits reported by the vehicle and set both front zones; changing the target alone does not turn climate on. Normal climate and full shutdown exit an active keeper mode first. Clicked actions can wake an unavailable vehicle before sending the command.
 - **Sentry submenu:** turn Sentry on or off using the existing Vehicle Commands permission. The active icon uses the same size, monochrome tint and placement as the other indicators.
+- **Locks and trunks submenu:** lock/unlock the vehicle, open the front trunk and toggle the rear trunk, with current or last-known lock and trunk readings. Actions use the existing Vehicle Commands permission and signing key. A rear-trunk toggle follows the vehicle's current position; it is never retried automatically after an uncertain result. Rear closing requires vehicle support.
 - **Location submenu (optional):** address, reading time, a MapMap preview with a blue vehicle dot and no POI pins, and an Apple Maps link. Requires Vehicle Location consent; map sharing is separately enabled and needs no map API key. Offline data is explicitly labeled as last known.
 - **Private profiles:** tokens and Client Secret in Keychain; configuration, signing key and cached readings in the current user's Application Support directory.
 - **Updates preserve your setup:** existing keys, credentials, readings and xBar interval remain intact.
@@ -69,7 +74,7 @@ flowchart TD
 | `tesla-battery.1m.sh` | Small shell entry point in xBar's plugin directory. Its filename supplies the refresh interval. |
 | `tesla-action.sh` | Generated shell launcher that uses the Python interpreter selected during installation. Menu actions also call this launcher. |
 | [`tesla_xbar.py`](src/tesla_xbar.py) | Python standard-library application: Fleet API requests, OAuth and token renewal, cached readings, menu rendering and action handling. |
-| [`icons/`](src/icons/README.md) | Prebuilt monochrome image strips for climate modes, running climate and an unlocked vehicle. Python includes the matching PNG in xBar's output; macOS supplies its tint. No runtime image renderer is needed. |
+| [`icons/`](src/icons/README.md) | Prebuilt monochrome image strips for charging, Camp/Pet modes, running climate, an unlocked vehicle, Sentry and open front/rear trunks. Python includes the matching PNG in xBar's output; macOS supplies its tint. No runtime icon renderer is needed. |
 | `tesla-keychain`, built from [`keychain.swift`](src/keychain.swift) | Small Swift executable that accesses macOS Keychain. Secrets are passed to it through stdin. |
 | `tesla-location`, built from [`location.swift`](src/location.swift) | Short-lived Swift helper using Apple’s reverse-geocoding service. Receives only vehicle coordinates over stdin and returns a postal address. It never requests the Mac’s location. |
 | `tesla-map-image`, built from [`map_image.swift`](src/map_image.swift) | Local AppKit renderer. Receives map image bytes over stdin, adds a blue dot with a white outline and emits a Retina PNG. No network, GPS or Keychain access. |
@@ -78,7 +83,7 @@ flowchart TD
 
 A normal refresh checks vehicle availability and reads live data when available; otherwise it retains the last known reading. Wake is a separate, explicit action. The Python application sends ordinary API requests itself and delegates commands requiring signatures to the Go helper.
 
-The same `vehicle_data` request includes `charge_state`, `gui_settings`, `climate_state` and `vehicle_state`. Climate and lock indicators require no additional API calls or permissions beyond the existing vehicle-data access. Saved climate fields are limited to the keeper mode, on/off state, inside/outside temperatures, both front temperature settings and the vehicle's available temperature limits; the saved vehicle fields are `locked` and `sentry_mode`. Each section keeps its own reading timestamp. Clima and Sentry actions use the existing `vehicle_cmds` scope and paired signing key, where required. See [Tesla's documented commands](https://developer.tesla.com/docs/fleet-api/endpoints/vehicle-commands).
+The same `vehicle_data` request includes `charge_state`, `gui_settings`, `climate_state` and `vehicle_state`. Climate, lock and trunk readings require no additional API calls or permissions beyond the existing vehicle-data access. Saved climate fields are limited to the keeper mode, on/off state, inside/outside temperatures, both front temperature settings and the vehicle's available temperature limits; the saved vehicle fields are `locked`, `sentry_mode`, `ft` (front trunk) and `rt` (rear trunk). Each section keeps its own reading timestamp. Clima, Sentry, lock and trunk actions use the existing `vehicle_cmds` scope and paired signing key, where required. See [Tesla's documented commands](https://developer.tesla.com/docs/fleet-api/endpoints/vehicle-commands).
 
 When Location is enabled and authorized, the same request also includes `location_data`; the coordinates arrive in `drive_state`. Only latitude, longitude, their timestamp and the matching reverse-geocoded address are saved. Missing or denied location access does not block battery or climate data. Address lookup runs only when needed, at most once per minute; it has an eight-second deadline and no background daemon. The Apple Maps link uses coordinates rather than searching by address.
 
@@ -103,7 +108,7 @@ The xBar shell scripts are generated by [`scripts/install.py`](scripts/install.p
 
 ## Install
 
-Requires macOS, xBar, Python 3.9+, Go 1.23+, OpenSSL, Git and Apple's Command Line Tools. The installer builds the small Swift Keychain helper and Tesla's official command helper from a pinned source revision.
+Requires macOS, xBar, Python 3.9+, Go 1.23+, OpenSSL, Git and Apple's Command Line Tools. The installer builds the Swift Keychain, address and map-image helpers and Tesla's official command helper from a pinned source revision.
 
 ```sh
 git clone https://github.com/kolisko/tesla-xbar.git
@@ -166,15 +171,16 @@ GitHub checks include **CodeQL for Python and Swift, Gitleaks, a privacy scan, D
 - Offline is not proof of sleep. An HTTP 408 is treated as unavailable. The menu distinguishes confirmed sleep from offline status. Both add a small dot after the range or percentage and keep the usual cable/range color, rather than switching to gray.
 - Green can reflect a saved cable connection. A disconnection cannot be reflected until new vehicle data is received; the menu labels the saved state as **Last known cable state**. Only confirmed live charging gets a lightning symbol.
 - An offline/asleep reading can be old. The plugin keeps it and shows its timestamp; it never fabricates a fresh value.
-- Climate, unlock and Sentry icons require an online vehicle, a successful refresh and a section timestamp less than 30 minutes old. They disappear for offline/asleep states, failed refreshes or stale data; saved status text in the menu is then labeled **Last known**. Missing fields do not imply that climate is on or the car is unlocked. Icons reflect the last successful poll, not a push connection to the car.
+- Climate, unlock, Sentry and trunk icons require an online vehicle, a successful refresh and a section timestamp less than 30 minutes old. They disappear for offline/asleep states, failed refreshes or stale data; saved status text in the menu is then labeled **Last known**. Missing fields do not imply that climate is on, the car is unlocked or a trunk is open. Icons reflect the last successful poll, not a push connection to the car.
 - An address is the closest postal address returned by Apple, not a guarantee of the exact parking bay or house number. If lookup fails, the coordinate-based map link remains available. Tesla may show a location-sharing indicator in the vehicle while location is being requested.
 - Range is never estimated from battery percentage. API miles are converted to kilometers only when required by the vehicle's units.
 - Range/percentage selection is local. Automatic synchronization with the Tesla mobile app's display preference is not implemented.
 - Smooth green pulsing is not implemented; charging uses a static green label and lightning icon.
 - Avoiding wake commands does not guarantee that frequent live data reads cannot delay an already awake vehicle's sleep. Tesla recommends Fleet Telemetry for ongoing data needs; this local plugin uses polling. See [Tesla's API best practices](https://developer.tesla.com/docs/fleet-api/getting-started/best-practices).
-- Signed charging, climate and Sentry commands may require pairing the app key in the Tesla mobile app. Charging schedules, current and charge limit are not changed by the plugin. Turning climate and modes off does not change Cabin Overheat Protection or scheduled preconditioning settings.
+- Signed charging, climate, Sentry, lock and trunk commands may require pairing the app key in the Tesla mobile app. Charging schedules, current and charge limit are not changed by the plugin. Turning climate and modes off does not change Cabin Overheat Protection or scheduled preconditioning settings.
 - **Command accepted** is not the same as confirmed physical state. Confirmation appears only after a subsequent vehicle data read verifies the change.
 - A climate transition can involve two commands. If only the first succeeds, the menu reports partial acceptance and refreshes the state; it does not retry the failed command automatically.
+- Lock and trunk actions refresh the state after acceptance. The menu reports vehicle confirmation only when a new reading shows the expected state (or a changed rear-trunk position). Trunk "open" includes an unlatched/ajar reading; it does not prove the lid has finished moving. If the change is not yet visible, the menu keeps **Command accepted** until ordinary refresh updates the readings.
 
 ## Update
 
