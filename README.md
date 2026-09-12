@@ -62,28 +62,27 @@ xBar schedules the plugin and displays its text output. The Tesla integration ru
 
 ```mermaid
 flowchart TD
-    X["xBar: interval from plugin filename"] --> W["tesla-battery.1m.sh"]
-    W --> L["tesla-action.sh"]
-    L --> P["tesla_xbar.py → tesla_bar CLI"]
-    P --> R["Auth, API, vehicle state, commands and menu modules"]
-    P <--> F["Tesla Fleet API"]
-    P <--> K["tesla-keychain: Swift helper"]
-    K <--> V["macOS Keychain"]
-    P <--> D["Local configuration and saved readings"]
-    P --> C["tesla-control: Go helper"]
-    C -->|Signed vehicle commands| F
-    P -->|Optional coordinates over stdin| G["tesla-location: Swift geocoder"]
-    G --> A["Apple map services: postal address"]
-    P -->|Optional map viewport, no credentials| M["MapMap: static map image"]
-    P --> I["tesla-map-image: local blue dot and Retina PNG"]
+    X["xBar: wrapper interval"] --> B["Entrypoint and bootstrap"]
+    B --> P["Presentation: CLI / pure menu renderer"]
+    B --> S["Application services"]
+    S --> D["Domain rules"]
+    S --> C["Ports: VehicleGateway, Profile, Clock, Identity, Maps"]
+    I["Infrastructure adapters"] -. implements .-> C
+    I --> T["Tesla Fleet API / official tesla-control"]
+    I --> L["Keychain / private files / map services"]
 ```
+
+The runtime has four strictly separated layers. Application services depend on **ports**, not concrete Tesla clients or filesystem helpers. All physical actions use the same `VehicleGateway.execute(VehicleCommand)` operation, including waking. The adapter decides between REST and signed commands. The menu renderer gets prepared data, image bytes and a timestamp; it performs no IO. Import-direction and cycle checks enforce these boundaries.
+
+See the [architecture guide](docs/ARCHITECTURE.md) for the layer contract, invocation flow and configuration ownership.
+
 
 | Component | Responsibility |
 | --- | --- |
 | `tesla-battery.1m.sh` | Small shell entry point in xBar's plugin directory. Its filename supplies the refresh interval. |
 | `tesla-action.sh` | Generated shell launcher that uses the Python interpreter selected during installation. Menu actions also call this launcher. |
-| [`tesla_xbar.py`](src/tesla_xbar.py) | Small Python entrypoint. Delegates to the modular runtime; retains checkout imports for existing tests and tools. |
-| [`tesla_bar/`](src/tesla_bar/README.md) | Standard-library modules for authentication, HTTPS transport, vehicle state, commands, location, menu output and a shared settings schema. Installed together as `tesla-runtime.zip` so an update replaces the whole module bundle atomically. |
+| [`tesla_xbar.py`](src/tesla_xbar.py) | Small Python entrypoint that calls the composition root. |
+| [`tesla_bar/`](src/tesla_bar/README.md) | Four layers: domain rules, application services/ports, presentation and infrastructure adapters. Uses only the standard library. Installed together as `tesla-runtime.zip` so an update replaces the whole module bundle atomically. |
 | [`icons/`](src/icons/README.md) | Prebuilt monochrome image strips for charging, Camp/Pet modes, running climate, an unlocked vehicle, Sentry and open front/rear trunks. Python includes the matching PNG in xBar's output; macOS supplies its tint. No runtime icon renderer is needed. |
 | `tesla-keychain`, built from [`keychain.swift`](src/keychain.swift) | Small Swift executable that accesses macOS Keychain. Secrets are passed to it through stdin. |
 | `tesla-location`, built from [`location.swift`](src/location.swift) | Short-lived Swift helper using Apple’s reverse-geocoding service. Receives only vehicle coordinates over stdin and returns a postal address. It never requests the Mac’s location. |
@@ -148,7 +147,7 @@ Choose **Settings…** in the plugin menu to open the interactive Terminal promp
 | Range or percentage | **Menu bar display** saves `display_mode` as `range` (default) or `percent`. This is a local choice, independent of the Tesla mobile app's display preference. |
 | Refresh interval | Managed by xBar's plugin filename: `tesla-battery.1m.sh` runs every minute; `tesla-battery.5m.sh` runs every five minutes. Change it through xBar's plugin management. There is no separate interval in `config.json`. |
 
-The shared [`settings schema`](src/tesla_bar/config.py) defines defaults, menu choices and validation for profile loading, the Terminal prompts, the optional local browser form (`tesla-action.sh provision`), and installer checks. Neither installer path rewrites existing settings. Saving the same application settings preserves its cached readings; changing Client ID requires the new app’s secret and clears the old login/vehicle selection.
+The shared [`settings schema`](src/tesla_bar/domain/settings.py) defines defaults, menu choices and validation for profile loading, the Terminal prompts, the optional local browser form (`tesla-action.sh provision`), and installer checks. Neither installer path rewrites existing settings. Saving the same application settings preserves its cached readings; changing Client ID requires the new app’s secret and clears the old login/vehicle selection.
 
 [`config.example.json`](examples/config.example.json) shows placeholder settings for reference. It is not the live configuration file and is not automatically copied over your profile. The color thresholds (orange below 350 km, red below 300 km when unplugged) are currently code constants, not configurable JSON fields.
 

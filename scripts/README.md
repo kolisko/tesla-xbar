@@ -37,4 +37,4 @@ See the [setup guide](../docs/SETUP.md) and [contribution guide](../.github/CONT
 
 The installer also builds `tesla-location` from `src/location.swift` for optional Apple reverse geocoding. Runtime-only updates require this helper to exist.
 
-The installer validates existing settings with `src/tesla_bar/config.py` without rewriting them. It packages Python modules deterministically into `tesla-runtime.zip` and atomically replaces that bundle before updating the entrypoint. Private profiles, map files and bytecode are never bundled.
+The installer validates existing settings with `src/tesla_bar/domain/settings.py` without rewriting them. It packages all nested Python modules deterministically into `tesla-runtime.zip` and atomically replaces that bundle before updating the entrypoint. Private profiles, map files and bytecode are never bundled.

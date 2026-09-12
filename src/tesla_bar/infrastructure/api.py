@@ -1,7 +1,8 @@
-"""Api responsibilities for Tesla xBar."""
+"""Low-level Fleet API transport and vehicle capability requests."""
 import urllib.parse
-from .errors import APIError, AppError
-from .config import REGIONS
+from ..domain.errors import AppError
+from .errors import APIError
+from .configuration import REGIONS
 from . import transport
 from .auth import Authenticator
 
@@ -22,7 +23,7 @@ class Client:
         return self.auth.granted_scopes()
 
     def vehicle_command(self, vin, command, capabilities, temperature=None):
-        from .commands import send_vehicle_command
+        from .command_transport import send_vehicle_command
         return send_vehicle_command(self, vin, command, capabilities, temperature)
 
     def get(self, path):

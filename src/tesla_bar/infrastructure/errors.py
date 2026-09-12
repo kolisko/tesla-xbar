@@ -1,12 +1,10 @@
-"""Errors responsibilities for Tesla xBar."""
+"""Translate HTTP failures at the infrastructure boundary."""
+from ..domain.errors import RemoteError, Failure
 
+HTTP_REASONS = {401: Failure.UNAUTHORIZED, 403: Failure.FORBIDDEN,
+                408: Failure.UNAVAILABLE, 429: Failure.RATE_LIMITED}
 
-
-class AppError(Exception):
-    pass
-
-
-class APIError(AppError):
+class APIError(RemoteError):
     def __init__(self, status, retry_after=0):
         self.status = status
         self.retry_after = retry_after
@@ -18,4 +16,4 @@ class APIError(AppError):
                     412: "Complete the app registration in the account’s region.",
                     421: "Your account is in another region. Change the region in Settings.",
                     429: "Tesla rate limit reached. Refresh has been postponed."}
-        super().__init__(messages.get(status, f"Tesla API: HTTP error {status}."))
+        super().__init__(HTTP_REASONS.get(status, Failure.REMOTE), messages.get(status, f"Tesla API: HTTP error {status}."), retry_after)

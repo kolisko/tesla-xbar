@@ -8,8 +8,8 @@ import time
 import unittest
 from unittest.mock import patch
 
-from src import tesla_xbar as app
-from src.tesla_bar import runtime
+from tests import harness as app
+from src.tesla_bar.infrastructure import runtime
 from tests.test_tesla_xbar import FakeClient
 
 

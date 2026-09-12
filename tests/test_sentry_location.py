@@ -8,8 +8,9 @@ import time
 import unittest
 from unittest.mock import patch
 
-from src import tesla_xbar as app
-from src.tesla_bar import api, cli, location, runtime, transport
+from tests import harness as app
+from src.tesla_bar.infrastructure import api, auth, maps as location, runtime, transport
+from src.tesla_bar import bootstrap as cli
 from tests.test_commands import CommandClient
 from tests.test_tesla_xbar import Vault
 
@@ -213,7 +214,7 @@ class FeatureTests(unittest.TestCase):
 
     def test_location_enable_persists_opt_in_before_authorization(self):
         app.save_json("config.json", self.config)
-        with patch.object(cli, "authorize") as authorize, patch("sys.argv", ["plugin", "location-enable", "--no-browser"]), patch("sys.stdout", new_callable=io.StringIO):
+        with patch.object(auth, "authorize") as authorize, patch("sys.argv", ["plugin", "location-enable", "--no-browser"]), patch("sys.stdout", new_callable=io.StringIO):
             self.assertEqual(app.main(), 0)
         self.assertTrue(authorize.call_args.args[0]["location_enabled"])
         self.assertEqual(authorize.call_args.kwargs, {"launch": False})

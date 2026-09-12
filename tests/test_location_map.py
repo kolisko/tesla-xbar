@@ -11,8 +11,8 @@ import zlib
 from pathlib import Path
 from unittest.mock import patch, MagicMock
 
-from src import tesla_xbar as app
-from src.tesla_bar import location, runtime
+from tests import harness as app
+from src.tesla_bar.infrastructure import maps as location, runtime
 import urllib.request
 from tests.test_sentry_location import FeatureClient
 

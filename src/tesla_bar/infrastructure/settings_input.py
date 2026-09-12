@@ -1,4 +1,7 @@
-"""Settings ui responsibilities for Tesla xBar."""
+"""Interactive terminal and loopback HTTP input adapters.
+
+Settings rules are supplied as callbacks; this adapter never constructs services.
+"""
 import getpass
 import html
 import http.server
@@ -7,40 +10,12 @@ import subprocess
 import time
 import urllib.parse
 import webbrowser
-from . import runtime
-from .config import SETTINGS, CONNECTION_FIELDS, validate_configuration, save_configuration
-from .runtime import locked, read_json, save_json
-from .errors import AppError
-from .config import configuration
-from .auth import Keychain
+from ..domain.settings import SETTINGS, CONNECTION_FIELDS
+from ..domain.errors import AppError
 
-
-def apply_settings(config, changes, secret="", vault=None):
-    """Validate before writing; every credential/settings UI uses this path."""
-    updated = validate_configuration(config | changes, require_connection=True)
-    if not isinstance(secret, str) or len(secret) > 2048:
-        raise AppError("Invalid Client Secret.")
-    vault = vault or Keychain()
-    changed_client = bool(config.get("client_id") and config["client_id"] != updated["client_id"])
-    if not secret and (changed_client or not vault.get("client-secret")):
-        raise AppError("Enter the Client Secret for this application.")
-    if secret:
-        vault.set("client-secret", secret)
-    if changed_client:
-        vault.request("delete", "oauth")
-        updated.pop("vin", None)
-        updated.pop("registered", None)
-        save_json("cache.json", {})
-    updated = save_configuration(updated)
-    cache = read_json("cache.json")
-    cache.pop("next_poll", None)
-    save_json("cache.json", cache)
-    return updated
-
-
-def configure():
+def configure(load, apply):
     print("Tesla xBar • Settings\nFind your Client ID and Client Secret in the Tesla Developer portal.")
-    config = configuration()
+    config = load()
     changes = {}
     for name in CONNECTION_FIELDS:
         field = SETTINGS[name]
@@ -48,30 +23,11 @@ def configure():
         value = input(f"{field.label}{choices} [{config.get(name, field.default)}]: ").strip()
         changes[name] = value or config.get(name, field.default)
     secret = getpass.getpass("Client Secret (press Enter to keep the saved value): ").strip()
-    with locked():
-        apply_settings(configuration(), changes, secret)
+    apply(changes, secret)
     print("Settings saved. Next, register the app and connect your Tesla account.")
 
 
-def settings_fields_html(config):
-    fields = []
-    for name in CONNECTION_FIELDS + ("display_mode",):
-        field = SETTINGS[name]
-        value = str(config.get(name, field.default))
-        fields.append(f'<label for="{name}">{field.label}</label>')
-        if field.choices:
-            options = "".join(f'<option value="{key}"' + (' selected' if key == value else '')
-                              + f'>{label}</option>' for key, label in field.choices)
-            fields.append(f'<select id="{name}" name="{name}">{options}</select>')
-        else:
-            fields.append(f'<input id="{name}" name="{name}" required maxlength="{field.max_length}" '
-                          + f'value="{html.escape(value, quote=True)}">')
-    fields.append('<label for="client_secret">Client Secret (leave blank to keep saved)</label>'
-                  '<input id="client_secret" name="client_secret" type="password" maxlength="2048">')
-    return "".join(fields)
-
-
-def provision(config, launch=True):
+def provision(config, apply, sessions, form, launch=True):
     """Short-lived loopback form for private browser-to-Keychain provisioning."""
     nonce = secrets.token_urlsafe(32)
     csrf = secrets.token_urlsafe(32)
@@ -105,7 +61,7 @@ def provision(config, launch=True):
             self.respond("<h1>Tesla xBar Settings</h1><p>Your Client Secret stays in this Mac's Keychain.</p>"
                 "<form method='post' autocomplete='off'>"
                 f"<input type='hidden' name='csrf' value='{csrf}'>"
-                + settings_fields_html(config) + "<button type='submit'>Save settings</button></form>")
+                + form(config) + "<button type='submit'>Save settings</button></form>")
 
         def do_POST(self):
             # Embedded browsers may send an opaque Origin. Both the unguessable
@@ -125,8 +81,7 @@ def provision(config, launch=True):
                 changes = {name: fields.get(name, [config.get(name, SETTINGS[name].default)])[0]
                            for name in CONNECTION_FIELDS + ("display_mode",)}
                 client_secret = fields.get("client_secret", [""])[0].strip()
-                with locked():
-                    apply_settings(configuration(), changes, client_secret)
+                apply(changes, client_secret)
                 result["success"] = True
                 self.respond("<h1>Credentials saved</h1><p>You can now complete registration and connect your Tesla account.</p>")
             except AppError as exc:
@@ -137,7 +92,7 @@ def provision(config, launch=True):
     with http.server.HTTPServer(("127.0.0.1", 8766), Setup) as server:
         server.timeout = 1
         url = "http://127.0.0.1:8766/setup/" + nonce
-        save_json("setup-session.json", {"url": url, "expires_at": time.time() + 600})
+        sessions.save( {"url": url, "expires_at": time.time() + 600})
         print("Local credential setup is ready (expires in 10 minutes).", flush=True)
         if launch:
             webbrowser.open(url)
@@ -146,7 +101,7 @@ def provision(config, launch=True):
             while not result and time.monotonic() < deadline:
                 server.handle_request()
         finally:
-            (runtime.APP_DIR / "setup-session.json").unlink(missing_ok=True)
+            sessions.delete()
     if not result:
         raise AppError("Credential setup timed out.")
     print("Credentials saved to Keychain.")

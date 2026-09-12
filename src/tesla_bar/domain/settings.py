@@ -1,16 +1,11 @@
 """One schema for profile loading, settings forms, menu choices and installation."""
 from dataclasses import dataclass
 import re
-import json
 import urllib.parse
 
 from .errors import AppError
-from .runtime import save_json
-from . import runtime
 
-REGIONS = {"eu": "https://fleet-api.prd.eu.vn.cloud.tesla.com",
-           "na": "https://fleet-api.prd.na.vn.cloud.tesla.com",
-           "cn": "https://fleet-api.prd.cn.vn.cloud.tesla.cn"}
+REGION_NAMES = ("eu", "na", "cn")
 REDIRECT = "http://localhost:8765/callback"
 
 
@@ -25,7 +20,7 @@ class Setting:
 SETTINGS = {
     "client_id": Setting("Client ID", ""),
     "domain": Setting("Public key domain", ""),
-    "region": Setting("Region", "eu", tuple((r, r.upper()) for r in REGIONS)),
+    "region": Setting("Region", "eu", tuple((r, r.upper()) for r in REGION_NAMES)),
     "redirect_uri": Setting("Redirect URI", REDIRECT, max_length=2048),
     "display_mode": Setting("Menu bar display", "range", (("range", "Range"), ("percent", "Percentage"))),
     "location_enabled": Setting("Location", False),
@@ -77,25 +72,4 @@ def validate_configuration(config, *, require_connection=False):
         for name in ("client_id", "domain"):
             if not result[name]:
                 raise AppError(f"{SETTINGS[name].label} is required.")
-    return result
-
-
-def configuration():
-    try:
-        raw = (runtime.APP_DIR / "config.json").read_text()
-    except FileNotFoundError:
-        return dict(DEFAULTS)
-    except OSError:
-        raise AppError("Could not read Settings. Check the profile permissions.") from None
-    try:
-        value = json.loads(raw)
-    except ValueError:
-        raise AppError("Settings contain invalid JSON. Restore or repair config.json.") from None
-    return validate_configuration(value)
-
-
-def save_configuration(config, changes=None):
-    """Caller holds the profile lock; unknown private metadata is preserved."""
-    result = validate_configuration(config | (changes or {}))
-    save_json("config.json", result)
     return result

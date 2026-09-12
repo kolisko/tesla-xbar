@@ -10,8 +10,11 @@ import unittest
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from unittest.mock import Mock, patch
 
-from src.tesla_bar import api, auth, cli, config, menu, runtime, settings_ui, transport
-from src.tesla_bar.errors import AppError, APIError
+from src.tesla_bar.infrastructure import api, auth, configuration as config, runtime, transport
+from src.tesla_bar import bootstrap as cli
+from tests import harness as menu, harness as settings_ui
+from src.tesla_bar.domain.errors import AppError
+from src.tesla_bar.infrastructure.errors import APIError
 from scripts import install
 from tests.test_tesla_xbar import Vault
 
@@ -73,7 +76,7 @@ class SettingsTests(unittest.TestCase):
         self.assertEqual(saved["display_mode"], "percent")
         self.assertEqual(runtime.read_json("cache.json"), cache)
         vault.set.assert_not_called()
-        vault.request.assert_not_called()
+        vault.delete.assert_not_called()
 
     def test_new_application_requires_its_secret_and_clears_old_vehicle(self):
         vault = Mock()
@@ -83,7 +86,7 @@ class SettingsTests(unittest.TestCase):
                                           {"client_id": "new-app"}, "new-secret", vault=vault)
         self.assertFalse(saved["vin"])
         self.assertNotIn("registered", saved)
-        vault.request.assert_called_once_with("delete", "oauth")
+        vault.delete.assert_called_once_with("oauth")
         self.assertEqual(runtime.read_json("cache.json"), {})
 
     def test_terminal_settings_use_same_validation_and_storage(self):
@@ -102,7 +105,7 @@ class SettingsTests(unittest.TestCase):
         data = install.runtime_bundle(source)
         self.assertEqual(data, install.runtime_bundle(source))
         with zipfile.ZipFile(io.BytesIO(data)) as archive:
-            self.assertIn("tesla_bar/cli.py", archive.namelist())
+            self.assertIn("tesla_bar/presentation/cli.py", archive.namelist())
             self.assertTrue(all(name.endswith(".py") for name in archive.namelist()))
 
 
@@ -117,13 +120,13 @@ class RegionTests(unittest.TestCase):
         self.vault = Vault({"access_token": "example-token", "expires_at": time.time() + 3600})
         self.auth = auth.Authenticator(self.config, self.vault)
 
-    def test_authoritative_allowed_region_is_saved_and_used(self):
+    def test_authoritative_region_is_returned_for_application_to_save(self):
         with patch.object(transport, "request_json", return_value={"response": {"fleet_api_base_url": config.REGIONS["na"]}}) as request:
-            self.assertTrue(self.auth.detect_region())
+            self.assertEqual(self.auth.detect_region(), "na")
             self.assertTrue(request.call_args.args[0].endswith("/users/region"))
-            api.Client(self.config, self.vault).get("/api/1/vehicles")
+            api.Client(self.config | {"region": "na"}, self.vault).get("/api/1/vehicles")
             self.assertEqual(request.call_args.args[0], config.REGIONS["na"] + "/api/1/vehicles")
-        self.assertEqual(config.configuration()["region"], "na")
+        self.assertFalse((runtime.APP_DIR / "config.json").exists())
 
     def test_bad_or_unavailable_region_keeps_manual_fallback(self):
         for base in (None, "https://example.com", config.REGIONS["na"] + ".example.com", config.REGIONS["na"] + "/path", "http://" + config.REGIONS["na"][8:]):
@@ -274,7 +277,7 @@ class CallbackIntegrationTests(unittest.TestCase):
                      {"response": {"fleet_api_base_url": config.REGIONS["na"]}}]
         with patch.object(auth.http.server, "HTTPServer", Server), patch.object(auth, "Keychain", return_value=self.vault), \
              patch.object(transport, "request_json", side_effect=responses) as request, patch("builtins.print"):
-            auth.authorize(self.config, launch=False)
+            settings_ui.authorize(self.config, launch=False)
         self.assertEqual(request.call_count, 2)
         self.assertEqual(config.configuration()["region"], "na")
         self.assertEqual(runtime.read_json("cache.json")["updated_at"], 123)

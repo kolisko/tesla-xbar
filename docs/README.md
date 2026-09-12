@@ -2,6 +2,7 @@
 
 | Path | Contents |
 | --- | --- |
+| [`ARCHITECTURE.md`](ARCHITECTURE.md) | Layer boundaries, dependency ports, command dispatch, configuration ownership and enforcement. |
 | [`SETUP.md`](SETUP.md) | Installation, public-key hosting, Tesla Developer registration, account consent, vehicle pairing and troubleshooting. |
 | [`CHANGELOG.md`](CHANGELOG.md) | Release history, feature changes and upgrade instructions. |
 | [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md) | Licensing and attribution for separately built or installed software. |
