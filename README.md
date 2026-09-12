@@ -4,6 +4,8 @@
 [![CodeQL](https://github.com/kolisko/tesla-xbar/actions/workflows/codeql.yml/badge.svg)](https://github.com/kolisko/tesla-xbar/actions/workflows/codeql.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
+**Current release: [v0.2.0](https://github.com/kolisko/tesla-xbar/releases/tag/v0.2.0)** · [Changelog](docs/CHANGELOG.md)
+
 Your Tesla's battery range or percentage in the macOS menu bar, powered by the official Fleet API. Built for [xBar](https://xbarapp.com/), with English menus, local credential storage and charging, lock, trunk, climate and Sentry controls.
 
 <img src="docs/images/menu-bar.png" alt="Menu bar preview: monochrome lightning icon before a green 360 km label" width="320">
