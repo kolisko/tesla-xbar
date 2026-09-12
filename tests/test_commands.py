@@ -9,6 +9,7 @@ import unittest
 from unittest.mock import patch
 
 from src import tesla_xbar as app
+from src.tesla_bar import api, runtime
 from tests.test_tesla_xbar import Vault, WakeClient
 
 
@@ -43,8 +44,8 @@ class CommandsTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.root = Path(self.temp.name)
-        self.home = patch.object(app, "APP_DIR", self.root)
-        self.here = patch.object(app, "HERE", self.root)
+        self.home = patch.object(runtime, "APP_DIR", self.root)
+        self.here = patch.object(runtime, "HERE", self.root)
         self.home.start(); self.here.start()
         self.config = app.DEFAULTS | {"client_id": "example", "domain": "example.com", "vin": "EXAMPLEVIN"}
 
@@ -71,7 +72,7 @@ class CommandsTests(unittest.TestCase):
 
     def test_explicit_command_can_wake_then_start(self):
         client = CommandClient(state="asleep")
-        with patch.object(app.time, "sleep"):
+        with patch.object(time, "sleep"):
             app.run_vehicle_command(self.config, "charge-start", client)
         self.assertEqual(client.wakes, ["EXAMPLEVIN"])
         self.assertEqual(client.commands, [("EXAMPLEVIN", "charge-start")])
@@ -80,7 +81,7 @@ class CommandsTests(unittest.TestCase):
         app.save_json("config.json", self.config)
         client = CommandClient()
         for command in ("menu", "refresh"):
-            with patch.object(app, "Client", return_value=client), patch("sys.argv", ["plugin", command]), patch("sys.stdout", new_callable=io.StringIO):
+            with patch.object(api, "Client", return_value=client), patch("sys.argv", ["plugin", command]), patch("sys.stdout", new_callable=io.StringIO):
                 self.assertEqual(app.main(), 0)
         self.assertEqual(client.commands, [])
         self.assertEqual(client.wakes, [])
@@ -124,7 +125,7 @@ class CommandsTests(unittest.TestCase):
         client = app.Client(self.config, Vault({"access_token": token, "expires_at": time.time() + 3600}))
         ready = {"signing_required": True, "key_paired": True}
         result = subprocess.CompletedProcess([], 1, stdout="", stderr="Failure with " + token)
-        with patch.object(app.subprocess, "run", return_value=result) as run:
+        with patch.object(subprocess, "run", return_value=result) as run:
             with self.assertRaises(app.AppError) as error:
                 client.vehicle_command("EXAMPLEVIN", "charge-start", ready)
         self.assertNotIn(token, str(error.exception))
@@ -139,7 +140,7 @@ class CommandsTests(unittest.TestCase):
     def test_sdk_timeout_is_not_retried(self):
         (self.root / "tesla-control").touch(); (self.root / "command-key.pem").touch()
         client = app.Client(self.config, Vault({"access_token": "secret", "expires_at": time.time() + 3600}))
-        with patch.object(app.subprocess, "run", side_effect=subprocess.TimeoutExpired("tool", 45)) as run:
+        with patch.object(subprocess, "run", side_effect=subprocess.TimeoutExpired("tool", 45)) as run:
             with self.assertRaisesRegex(app.AppError, "not be retried"):
                 client.vehicle_command("EXAMPLEVIN", "charge-start", {"signing_required": True, "key_paired": True})
         run.assert_called_once()

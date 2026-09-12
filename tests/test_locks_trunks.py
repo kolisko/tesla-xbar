@@ -8,6 +8,7 @@ import unittest
 from unittest.mock import patch
 
 from src import tesla_xbar as app
+from src.tesla_bar import api, cli, runtime, transport
 from tests.test_commands import CommandClient
 from tests.test_tesla_xbar import Vault
 
@@ -52,10 +53,10 @@ class LocksTrunksTests(unittest.TestCase):
         self.addCleanup(directory.cleanup)
         self.root = Path(directory.name)
         for name in ("APP_DIR", "HERE"):
-            mocked = patch.object(app, name, self.root)
+            mocked = patch.object(runtime, name, self.root)
             mocked.start()
             self.addCleanup(mocked.stop)
-        network = patch.object(app, "request_json", side_effect=AssertionError("No real Tesla requests"))
+        network = patch.object(transport, "request_json", side_effect=AssertionError("No real Tesla requests"))
         network.start()
         self.addCleanup(network.stop)
         self.config = app.DEFAULTS | {"client_id": "example", "vin": "EXAMPLEVIN"}
@@ -86,14 +87,14 @@ class LocksTrunksTests(unittest.TestCase):
 
     def test_manual_action_can_wake_once_but_menu_and_refresh_never_actuate(self):
         client = AccessClient(state="asleep")
-        with patch.object(app.time, "sleep"):
+        with patch.object(time, "sleep"):
             app.run_vehicle_command(self.config, "door-lock", client)
         self.assertEqual(client.wakes, ["EXAMPLEVIN"])
         self.assertEqual(client.commands, [("EXAMPLEVIN", "door-lock")])
         app.save_json("config.json", self.config)
         client = AccessClient(state="asleep")
         for command in ("menu", "refresh"):
-            with patch.object(app, "Client", return_value=client), patch("sys.argv", ["plugin", command]), patch("sys.stdout", new_callable=io.StringIO):
+            with patch.object(api, "Client", return_value=client), patch("sys.argv", ["plugin", command]), patch("sys.stdout", new_callable=io.StringIO):
                 self.assertEqual(app.main(), 0)
         self.assertEqual(client.commands, [])
         self.assertEqual(client.wakes, [])
@@ -134,7 +135,7 @@ class LocksTrunksTests(unittest.TestCase):
                  ("frunk-open", "frunk-open", "actuate_trunk", {"which_trunk": "front"}),
                  ("trunk-move", "trunk-move", "actuate_trunk", {"which_trunk": "rear"}))
         for command, cli, endpoint, body in cases:
-            with patch.object(app.subprocess, "run", return_value=subprocess.CompletedProcess([], 0)) as run:
+            with patch.object(subprocess, "run", return_value=subprocess.CompletedProcess([], 0)) as run:
                 client.vehicle_command("EXAMPLEVIN", command, {"signing_required": True, "key_paired": True})
             self.assertEqual(run.call_args.args[0][-1], cli)
             self.assertEqual(run.call_args.kwargs["input"], "private-token")
@@ -186,11 +187,11 @@ class LocksTrunksTests(unittest.TestCase):
             parameters = dict(part.split("=", 1) for part in shlex.split(line.split(" | ")[1]))
             arguments = [parameters[f"param{i}"] for i in range(1, 5)]
             self.assertEqual(arguments, ["command", command, "--vin", "EXAMPLEVIN"])
-            with patch.object(app, "Client", return_value=client), patch("sys.argv", ["plugin"] + arguments), patch("sys.stdout", new_callable=io.StringIO):
+            with patch.object(api, "Client", return_value=client), patch("sys.argv", ["plugin"] + arguments), patch("sys.stdout", new_callable=io.StringIO):
                 self.assertEqual(app.main(), 0)
             self.assertEqual(client.commands[-1], ("EXAMPLEVIN", command))
         app.save_json("config.json", self.config | {"vin": "OTHER"})
-        with patch.object(app, "Client", return_value=client), patch("sys.argv", ["plugin"] + arguments), patch("sys.stdout", new_callable=io.StringIO):
+        with patch.object(api, "Client", return_value=client), patch("sys.argv", ["plugin"] + arguments), patch("sys.stdout", new_callable=io.StringIO):
             self.assertEqual(app.main(), 0)
         self.assertEqual(len(client.commands), 4)
         self.assertIn("selected vehicle has changed", app.read_json("command-result.json")["message"])

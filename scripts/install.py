@@ -2,6 +2,9 @@
 """Install generic code while preserving the user's private Tesla xBar profile."""
 import argparse
 import fcntl
+import io
+import json
+import zipfile
 import os
 from pathlib import Path
 import shlex
@@ -10,6 +13,8 @@ import sys
 import tempfile
 
 from .build_commands import build_commands
+from src.tesla_bar.config import validate_configuration
+from src.tesla_bar.errors import AppError
 
 VERSION = "0.2.0"
 
@@ -64,11 +69,26 @@ def build_helpers(source):
             "tesla-control": build_commands()}
 
 
+def runtime_bundle(source):
+    """Build a deterministic stdlib zipimport package; never include private data."""
+    package = source / "src" / "tesla_bar"
+    if not (package / "__init__.py").is_file():
+        raise RuntimeError("The Python runtime package is missing from this checkout.")
+    output = io.BytesIO()
+    with zipfile.ZipFile(output, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+        for path in sorted(package.glob("*.py")):
+            info = zipfile.ZipInfo("tesla_bar/" + path.name, date_time=(2020, 1, 1, 0, 0, 0))
+            info.compress_type = zipfile.ZIP_DEFLATED
+            archive.writestr(info, path.read_bytes())
+    return output.getvalue()
+
+
 def install(source, target, plugins, *, runtime_only=False, python=None):
     active = sorted(plugins.glob("tesla-battery.*.sh"))
     if len(active) > 1:
         raise RuntimeError("Multiple active Tesla plugins found. Keep only one in xBar and run the installer again.")
     plugin = active[0] if active else plugins / "tesla-battery.1m.sh"
+    bundle = runtime_bundle(source)
     helpers = {} if runtime_only else build_helpers(source)
     if runtime_only and not all((target / name).is_file() for name in ("tesla-keychain", "tesla-control", "tesla-location", "tesla-map-image")):
         raise RuntimeError("Helpers are missing. Run the installer without --runtime-only first.")
@@ -80,9 +100,12 @@ def install(source, target, plugins, *, runtime_only=False, python=None):
             fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
         except BlockingIOError:
             raise RuntimeError("Tesla xBar is busy. Try updating after the current operation finishes.") from None
+        if (target / "config.json").exists():
+            validate_configuration(json.loads((target / "config.json").read_text()))
         ensure_keys(target)
         for name, binary in helpers.items():
             atomic_install(binary.read_bytes(), target / name, 0o700)
+        atomic_install(bundle, target / "tesla-runtime.zip", 0o600)
         atomic_install((source / "src" / "tesla_xbar.py").read_bytes(), target / "tesla_xbar.py", 0o600)
         icons = target / "icons"
         icons.mkdir(exist_ok=True, mode=0o700)
@@ -111,8 +134,8 @@ def main():
     plugins = Path.home() / "Library/Application Support/xbar/plugins"
     try:
         plugin = install(source, target, plugins, runtime_only=args.runtime_only)
-    except (OSError, RuntimeError, subprocess.SubprocessError) as error:
-        print(str(error) if isinstance(error, RuntimeError) else "Installation failed. Check your build tools and filesystem permissions.", file=sys.stderr)
+    except (OSError, ValueError, AppError, RuntimeError, subprocess.SubprocessError) as error:
+        print(str(error) if isinstance(error, (RuntimeError, AppError)) else "Installation failed. Check your build tools and filesystem permissions.", file=sys.stderr)
         return 1
     print(f"Installed: {plugin}")
     print(f"Private profile preserved in: {target}")

@@ -2,6 +2,15 @@
 
 Release tags use `vMAJOR.MINOR.PATCH`; the installed xBar plugin metadata uses the same version without the `v` prefix.
 
+## Unreleased
+
+- Split the Python runtime into focused modules while preserving the existing CLI and vehicle behavior.
+- Reuse direct HTTPS connections within each invocation; retain proxy support and never automatically replay uncertain commands.
+- Verify the account region once after sign-in against official Tesla hosts, with the configured region as fallback.
+- Share settings defaults, choices and validation across profile loading, Terminal/browser settings, menu actions and installation.
+- Install Python modules as one atomic bundle; preserve existing settings, keys, readings and refresh interval.
+- Preserve cached readings when saving credentials for the same application through the browser form.
+
 ## v0.2.0 — 2026-09-12
 
 ### Added

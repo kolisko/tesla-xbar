@@ -6,6 +6,8 @@ import unittest
 from unittest.mock import patch
 
 from src import tesla_xbar as app
+from src.tesla_bar import api, runtime, transport
+import fcntl
 from tests.test_commands import CommandClient
 from tests.test_tesla_xbar import FakeClient, WakeClient
 
@@ -14,10 +16,10 @@ class ReliabilityTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
-        self.home = patch.object(app, "APP_DIR", Path(self.temp.name))
+        self.home = patch.object(runtime, "APP_DIR", Path(self.temp.name))
         self.home.start()
         self.addCleanup(self.home.stop)
-        network = patch.object(app, "request_json", side_effect=AssertionError("Tests must never call Tesla"))
+        network = patch.object(transport, "request_json", side_effect=AssertionError("Tests must never call Tesla"))
         network.start()
         self.addCleanup(network.stop)
         self.config = app.DEFAULTS | {"client_id": "example"}
@@ -28,7 +30,7 @@ class ReliabilityTests(unittest.TestCase):
 
     def main(self, args, client=None):
         with patch("sys.argv", ["plugin"] + args), patch("sys.stdout", new_callable=io.StringIO) as output:
-            with patch.object(app, "Client", return_value=client) as factory:
+            with patch.object(api, "Client", return_value=client) as factory:
                 result = app.main()
         return result, output.getvalue(), factory
 
@@ -102,7 +104,7 @@ class ReliabilityTests(unittest.TestCase):
         capabilities.assert_not_called()
 
     def test_failed_or_expired_readings_keep_connected_green_without_live_lightning(self):
-        with patch.object(app.time, "time", return_value=10_000):
+        with patch.object(time, "time", return_value=10_000):
             cache = self.seed()
             for charging_state, color in (("Charging", "#32CD66"), ("Stopped", "#32CD66"),
                                            ("Disconnected", "#EF4444")):
@@ -136,13 +138,13 @@ class ReliabilityTests(unittest.TestCase):
 
     def test_429_uses_exact_server_delay_and_retries_at_deadline(self):
         client = FakeClient()
-        with patch.object(app.time, "time", return_value=1000), patch.object(client, "get", side_effect=app.APIError(429, 60)):
+        with patch.object(time, "time", return_value=1000), patch.object(client, "get", side_effect=app.APIError(429, 60)):
             cache = app.fetch_state(self.config, client=client)
         self.assertEqual(cache["retry_at"], 1060)
-        with patch.object(app.time, "time", return_value=1059):
+        with patch.object(time, "time", return_value=1059):
             app.fetch_state(self.config, client=client)
         self.assertEqual(client.calls, [])
-        with patch.object(app.time, "time", return_value=1060):
+        with patch.object(time, "time", return_value=1060):
             cache = app.fetch_state(self.config, client=client)
         self.assertEqual(len(client.calls), 2)
         self.assertNotIn("retry_at", cache)
@@ -159,35 +161,35 @@ class ReliabilityTests(unittest.TestCase):
         self.assertEqual(app.retry_after_seconds("60"), 60)
         for value in ("", "garbage", "-20"):
             self.assertEqual(app.retry_after_seconds(value), 0)
-        with patch.object(app.time, "time", return_value=0):
+        with patch.object(time, "time", return_value=0):
             self.assertEqual(app.retry_after_seconds("Thu, 01 Jan 1970 00:01:00 GMT"), 60)
 
     def test_wake_429_has_no_fifteen_minute_minimum(self):
         self.seed()
         client = WakeClient(error=app.APIError(429, 60))
-        with patch.object(app.time, "time", return_value=1000):
+        with patch.object(time, "time", return_value=1000):
             cache = app.wake_and_refresh(self.config, client=client)
         self.assertEqual(cache["retry_at"], 1060)
         self.assertEqual(len(client.wakes), 1)
 
     def test_busy_manual_actions_exit_without_queue_and_leave_visible_notice(self):
         self.seed()
-        cache_before = (app.APP_DIR / "cache.json").read_bytes()
+        cache_before = (runtime.APP_DIR / "cache.json").read_bytes()
         pending = {"vin": "EXAMPLEVIN", "status": "pending", "at": time.time(), "message": "Command in progress"}
         app.save_json("command-result.json", pending)
-        original_flock = app.fcntl.flock
+        original_flock = fcntl.flock
         def nonblocking_only(fd, operation):
-            if operation != app.fcntl.LOCK_UN:
-                self.assertTrue(operation & app.fcntl.LOCK_NB, "Manual action must never queue")
+            if operation != fcntl.LOCK_UN:
+                self.assertTrue(operation & fcntl.LOCK_NB, "Manual action must never queue")
             return original_flock(fd, operation)
         with app.locked():
-            with patch.object(app.fcntl, "flock", side_effect=nonblocking_only):
+            with patch.object(fcntl, "flock", side_effect=nonblocking_only):
                 for args in (["command", "charge-start"], ["wake-refresh"], ["command-setup"]):
                     code, output, factory = self.main(args + ["--vin", "EXAMPLEVIN"])
                     self.assertEqual(code, 0)
                     self.assertIn("Action not performed", output)
                     factory.assert_not_called()
-        self.assertEqual((app.APP_DIR / "cache.json").read_bytes(), cache_before)
+        self.assertEqual((runtime.APP_DIR / "cache.json").read_bytes(), cache_before)
         self.assertEqual(app.read_json("command-result.json"), pending)
         _, output, _ = self.main(["menu"], FakeClient())
         self.assertIn("Action not performed", output)
@@ -199,7 +201,7 @@ class ReliabilityTests(unittest.TestCase):
         _, output, _ = self.main(["command", "charge-start", "--vin", "EXAMPLEVIN"], client)
         self.assertEqual(client.commands, [("EXAMPLEVIN", "charge-start")])
         self.assertNotIn("Action not performed", output)
-        self.assertFalse((app.APP_DIR / "action-notice.json").exists())
+        self.assertFalse((runtime.APP_DIR / "action-notice.json").exists())
 
     def test_menu_binds_commands_and_wake_to_displayed_vin(self):
         menu = app.render(self.seed(), self.config)

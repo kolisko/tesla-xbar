@@ -52,7 +52,7 @@ Complete any required app review and billing setup in the portal. Keep your Clie
 
 ## 4. Configure, register the region and sign in
 
-Open **Settings…** in the xBar plugin. Enter your Client ID, Client Secret, public-key domain and region (`eu`, `na` or `cn`). The secret prompt is hidden. [`examples/config.example.json`](../examples/config.example.json) documents the non-secret fields; the installer does not copy example values over an existing profile.
+Open **Settings…** in the xBar plugin. Enter your Client ID, Client Secret, public-key domain and region (`eu`, `na` or `cn`). The secret prompt is hidden. The optional local browser form is available through `tesla-action.sh provision`; both interfaces use the same settings schema and validation. [`examples/config.example.json`](../examples/config.example.json) documents the non-secret fields; the installer does not copy example values over an existing profile.
 
 Register your domain in the selected Fleet API region from Terminal:
 
@@ -61,7 +61,7 @@ TESLA_XBAR_ACTION="$HOME/Library/Application Support/Tesla xBar/tesla-action.sh"
 "$TESLA_XBAR_ACTION" register
 ```
 
-Then choose **Connect Tesla account…** in xBar, sign in on Tesla's website and grant access to your vehicle. The browser returns to a temporary localhost callback on your Mac. It closes after authorization; ongoing refresh uses the saved tokens in Keychain.
+Then choose **Connect Tesla account…** in xBar, sign in on Tesla's website and grant access to your vehicle. The browser returns to a temporary localhost callback on your Mac. It closes after authorization; ongoing refresh uses the saved tokens in Keychain. After sign-in the plugin checks the account’s region once using Tesla’s [region endpoint](https://developer.tesla.com/docs/fleet-api/endpoints/user-endpoints). Only the official regional hosts are accepted. If verification is unavailable, your configured region remains in use. If Tesla identifies a different region, domain registration may also be required there; it is never submitted automatically.
 
 If you have multiple vehicles, choose **Select vehicle** in the menu. **Menu bar display** switches between Range and Percentage.
 
@@ -115,6 +115,8 @@ a new reading. A trunk marked open may be ajar rather than fully raised.
 git pull --ff-only
 python3 -m scripts.install
 ```
+
+Python modules are installed as one atomic `tesla-runtime.zip` bundle beside the entrypoint; the source remains organized under `src/tesla_bar/`.
 
 For an update that only changes Python code, icons or the wrapper, you can reuse installed helpers:
 

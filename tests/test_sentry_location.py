@@ -9,6 +9,7 @@ import unittest
 from unittest.mock import patch
 
 from src import tesla_xbar as app
+from src.tesla_bar import api, cli, location, runtime, transport
 from tests.test_commands import CommandClient
 from tests.test_tesla_xbar import Vault
 
@@ -49,12 +50,12 @@ class FeatureTests(unittest.TestCase):
         self.addCleanup(directory.cleanup)
         self.root = Path(directory.name)
         for name, value in (("APP_DIR", self.root),):
-            mocked = patch.object(app, name, value)
+            mocked = patch.object(runtime, name, value)
             mocked.start()
             self.addCleanup(mocked.stop)
         for name, options in (("request_json", {"side_effect": AssertionError("No real Tesla requests")}),
                               ("reverse_geocode", {"return_value": "Example Street 1\nExample City"})):
-            mocked = patch.object(app, name, **options)
+            mocked = patch.object(transport if name == "request_json" else location, name, **options)
             setattr(self, name, mocked.start())
             self.addCleanup(mocked.stop)
         self.config = app.DEFAULTS | {"client_id": "example", "vin": "EXAMPLEVIN"}
@@ -90,7 +91,7 @@ class FeatureTests(unittest.TestCase):
             (self.root / name).touch()
         client = app.Client(self.config, Vault({"access_token": "private-token", "expires_at": time.time() + 3600}))
         for command, enabled in (("sentry-on", True), ("sentry-off", False)):
-            with patch.object(app, "HERE", self.root), patch.object(app.subprocess, "run", return_value=subprocess.CompletedProcess([], 0)) as run:
+            with patch.object(runtime, "HERE", self.root), patch.object(subprocess, "run", return_value=subprocess.CompletedProcess([], 0)) as run:
                 client.vehicle_command("EXAMPLEVIN", command, {"signing_required": True, "key_paired": True})
             self.assertEqual(run.call_args.args[0][-2:], ["sentry-mode", "on" if enabled else "off"])
             self.assertNotIn("private-token", str(run.call_args.args))
@@ -112,7 +113,7 @@ class FeatureTests(unittest.TestCase):
         args = [params[f"param{i}"] for i in range(1, 5)]
         self.assertEqual(args, ["command", "sentry-off", "--vin", "EXAMPLEVIN"])
         app.save_json("config.json", self.config)
-        with patch.object(app, "Client", return_value=client), patch("sys.argv", ["plugin"] + args), patch("sys.stdout", new_callable=io.StringIO):
+        with patch.object(api, "Client", return_value=client), patch("sys.argv", ["plugin"] + args), patch("sys.stdout", new_callable=io.StringIO):
             self.assertEqual(app.main(), 0)
         self.assertFalse(client.sentry)
         for value in (False, None, "true", 1):
@@ -200,11 +201,8 @@ class FeatureTests(unittest.TestCase):
 
     def test_geocoder_errors_are_contained_and_input_never_goes_in_argv(self):
         # Call the real wrapper with a mocked subprocess, not Apple's service.
-        with patch.object(app.subprocess, "run", return_value=subprocess.CompletedProcess([], 0, '{"address":"Example"}')) as run:
-            from importlib import util
-            spec = util.spec_from_file_location("isolated_app", Path(app.__file__))
-            module = util.module_from_spec(spec)
-            spec.loader.exec_module(module)
+        with patch.object(subprocess, "run", return_value=subprocess.CompletedProcess([], 0, '{"address":"Example"}')) as run:
+            module = app  # Original callable; the location module dependency is mocked separately.
             self.assertEqual(module.reverse_geocode((40, -73)), "Example")
             self.assertEqual(json.loads(run.call_args.kwargs["input"]), {"latitude": 40, "longitude": -73})
             self.assertNotIn("40", str(run.call_args.args))
@@ -215,7 +213,7 @@ class FeatureTests(unittest.TestCase):
 
     def test_location_enable_persists_opt_in_before_authorization(self):
         app.save_json("config.json", self.config)
-        with patch.object(app, "authorize") as authorize, patch("sys.argv", ["plugin", "location-enable", "--no-browser"]), patch("sys.stdout", new_callable=io.StringIO):
+        with patch.object(cli, "authorize") as authorize, patch("sys.argv", ["plugin", "location-enable", "--no-browser"]), patch("sys.stdout", new_callable=io.StringIO):
             self.assertEqual(app.main(), 0)
         self.assertTrue(authorize.call_args.args[0]["location_enabled"])
         self.assertEqual(authorize.call_args.kwargs, {"launch": False})
