@@ -10,6 +10,12 @@ Your Tesla's battery range or percentage in the macOS menu bar, powered by the o
 
 ## See it in action
 
+See your vehicle's position on a real map directly inside **Location**. The current MapMap preview uses a blue vehicle dot with POI pins hidden; the submenu also shows the address, reading time and a link to Apple Maps.
+
+<a href="docs/images/sentry-location.png"><img src="docs/images/location-map-example.png" alt="Real MapMap preview of Times Square in New York, with a blue example vehicle-position dot, no POI pins and visible map attribution" width="720"></a>
+
+*Public landmark demo: Times Square, New York. This is the map style used by the plugin, with a fictional vehicle position—not a user's home or saved vehicle location. Click the map to see it inside the Location submenu.*
+
 Open the menu to see battery percentage, Tesla's range, charge limit, cable connection, charging power and the time of the last reading.
 
 <img src="docs/images/menu.png" alt="Tesla xBar dropdown showing battery information, charging controls, refresh and account settings" width="420">

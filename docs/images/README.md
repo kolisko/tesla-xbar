@@ -10,6 +10,8 @@ These illustrations show the plugin's appearance using fictional data and a neut
 | [`status-icons.svg`](status-icons.svg), [`status-icons.png`](status-icons.png) | Matching charging, Camp Mode, Pet Mode, climate fan, open padlock, Sentry and open front/rear trunk icons, plus a combined menu-bar example. |
 | [`clima.svg`](clima.svg), [`clima.png`](clima.png) | Clima controls for modes, temperature and shutdown. |
 | [`locks-trunks.svg`](locks-trunks.svg), [`locks-trunks.png`](locks-trunks.png) | Combined lock/unlock and front/rear trunk controls with illustrative state readings. |
+| [`location-map-example.png`](location-map-example.png) | Full-size MapMap preview featured near the top of the README: the public Times Square landmark, a blue example vehicle dot and no POI pins. |
+| [`sentry-location.svg`](sentry-location.svg), [`sentry-location.png`](sentry-location.png) | Sentry controls and the Location submenu containing the same public landmark map, example address, timestamp and Apple Maps link. |
 
 [`scripts/render_status_icons.cjs`](../../scripts/render_status_icons.cjs) generates
 the status-icons preview together with the runtime PNG assets. Its optional
