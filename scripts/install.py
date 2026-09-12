@@ -11,7 +11,7 @@ import tempfile
 
 from .build_commands import build_commands
 
-VERSION = "0.1.0"
+VERSION = "0.2.0"
 
 
 def atomic_install(data, destination, mode):
