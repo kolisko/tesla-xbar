@@ -1,6 +1,6 @@
 # Domain
 
-Pure rules with explicit inputs. This layer has no filesystem, network, credentials, process execution or implicit clock.
+Contents of this directory. See [Architecture](../../../docs/ARCHITECTURE.md) for layer responsibilities, dependency rules and runtime behavior.
 
 | File | Contents |
 | --- | --- |
@@ -10,5 +10,3 @@ Pure rules with explicit inputs. This layer has no filesystem, network, credenti
 | [`location.py`](location.py) | Geographic coordinate validation. |
 | [`errors.py`](errors.py) | Safe errors and transport-independent failure categories. |
 | [`__init__.py`](__init__.py) | Package marker. |
-
-Tesla URLs, HTTP status mappings, numeric keeper command codes and CLI argument mappings belong in infrastructure. Pass `now` explicitly to freshness rules.

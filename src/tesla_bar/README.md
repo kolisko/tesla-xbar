@@ -1,6 +1,6 @@
 # Python runtime
 
-The runtime uses four dependency-separated layers. See the [architecture guide](../../docs/ARCHITECTURE.md) for diagrams, ports, communication flow and configuration details.
+Contents of this directory. See [Architecture](../../docs/ARCHITECTURE.md) for layer responsibilities, dependency rules and runtime behavior.
 
 | Path | Responsibility |
 | --- | --- |
@@ -10,7 +10,3 @@ The runtime uses four dependency-separated layers. See the [architecture guide](
 | [`infrastructure/`](infrastructure/README.md) | Concrete Tesla, Keychain, profile, clock, map and local input adapters. |
 | [`bootstrap.py`](bootstrap.py) | Sole composition root connecting services and adapters. |
 | [`__init__.py`](__init__.py) | Package marker. Importing the package performs no requests or profile writes. |
-
-Application services import only the domain and application layer. Presentation and infrastructure may use domain rules and application contracts, but never each other. Architecture tests enforce these directions and reject cycles.
-
-The installer includes all nested `.py` files in one deterministic, atomically replaced `tesla-runtime.zip`. Swift/Go helpers and icons stay beside it. The runtime uses only Python's standard library and remains short-lived.

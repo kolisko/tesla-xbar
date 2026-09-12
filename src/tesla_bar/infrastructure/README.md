@@ -1,6 +1,6 @@
 # Infrastructure adapters
 
-Concrete IO implements application ports. This layer may import domain rules and application contracts, but never application services or presentation modules.
+Contents of this directory. See [Architecture](../../../docs/ARCHITECTURE.md) for layer responsibilities, dependency rules and runtime behavior.
 
 | File | Contents |
 | --- | --- |
@@ -17,5 +17,3 @@ Concrete IO implements application ports. This layer may import domain rules and
 | [`display.py`](display.py) | Icon bytes and atomic display-snapshot publication. |
 | [`settings_input.py`](settings_input.py) | Terminal prompts and temporary loopback form server with supplied validation/save callbacks. |
 | [`__init__.py`](__init__.py) | Package marker. |
-
-Files retain the existing private formats. Secrets go to Keychain; the command token is passed through stdin. No adapter logs raw credentials or command-helper errors. Selection, wake policy, user command sequencing and configuration-change rules belong to application services.
