@@ -17,4 +17,4 @@ Run `python3 -m scripts.install` from the repository root to install the applica
 
 The installer also generates `tesla-action.sh` and the `tesla-battery.1m.sh` xBar entry point with local executable paths. Tesla's Go command helper is built separately by [`scripts/build_commands.py`](../scripts/build_commands.py).
 
-See the [architecture and configuration overview](../README.md#architecture) and [setup guide](../docs/SETUP.md).
+See the [architecture document](../docs/ARCHITECTURE.md) and [setup guide](../docs/SETUP.md).

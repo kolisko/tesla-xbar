@@ -1,6 +1,6 @@
 # Application
 
-Use cases depend on the domain and the interfaces in `ports.py`. Dependencies arrive through constructors; services never create concrete adapters.
+Contents of this directory. See [Architecture](../../../docs/ARCHITECTURE.md) for layer responsibilities, dependency rules and runtime behavior.
 
 | File | Contents |
 | --- | --- |
@@ -12,5 +12,3 @@ Use cases depend on the domain and the interfaces in `ports.py`. Dependencies ar
 | [`settings.py`](settings.py) | Shared settings/credential update rules. |
 | [`location.py`](location.py) | Location timestamp/address reuse and map-refresh policy. |
 | [`__init__.py`](__init__.py) | Package marker. |
-
-All physical actions use `VehicleGateway.execute(VehicleCommand)`. Services see pairing readiness and safe failure categories, not signing algorithms or HTTP errors. No file paths, network requests, helper execution or xBar output are allowed here.
