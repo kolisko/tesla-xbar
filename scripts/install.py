@@ -13,8 +13,8 @@ import sys
 import tempfile
 
 from .build_commands import build_commands
-from src.tesla_bar.config import validate_configuration
-from src.tesla_bar.errors import AppError
+from src.tesla_bar.domain.settings import validate_configuration
+from src.tesla_bar.domain.errors import AppError
 
 VERSION = "0.2.0"
 
@@ -76,8 +76,8 @@ def runtime_bundle(source):
         raise RuntimeError("The Python runtime package is missing from this checkout.")
     output = io.BytesIO()
     with zipfile.ZipFile(output, "w", compression=zipfile.ZIP_DEFLATED) as archive:
-        for path in sorted(package.glob("*.py")):
-            info = zipfile.ZipInfo("tesla_bar/" + path.name, date_time=(2020, 1, 1, 0, 0, 0))
+        for path in sorted(package.rglob("*.py")):
+            info = zipfile.ZipInfo("tesla_bar/" + path.relative_to(package).as_posix(), date_time=(2020, 1, 1, 0, 0, 0))
             info.compress_type = zipfile.ZIP_DEFLATED
             archive.writestr(info, path.read_bytes())
     return output.getvalue()

@@ -10,7 +10,8 @@ import urllib.parse
 import urllib.request
 from contextlib import contextmanager
 
-from .errors import AppError, APIError
+from ..domain.errors import AppError
+from .errors import APIError
 
 
 class NoRedirect(urllib.request.HTTPRedirectHandler):

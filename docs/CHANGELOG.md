@@ -4,7 +4,10 @@ Release tags use `vMAJOR.MINOR.PATCH`; the installed xBar plugin metadata uses t
 
 ## Unreleased
 
-- Split the Python runtime into focused modules while preserving the existing CLI and vehicle behavior.
+- Separate domain rules, application services, presentation and infrastructure with explicit dependency ports and one composition root.
+- Route all physical actions, including wake, through one semantic vehicle gateway; keep REST/CLI translation and signing inside the Tesla adapter.
+- Make menu rendering independent of files, network and implicit time; isolate account/configuration updates from interactive input.
+- Enforce dependency direction and absence of cycles in tests, with in-memory service and side-effect-free renderer coverage.
 - Reuse direct HTTPS connections within each invocation; retain proxy support and never automatically replay uncertain commands.
 - Verify the account region once after sign-in against official Tesla hosts, with the configured region as fallback.
 - Share settings defaults, choices and validation across profile loading, Terminal/browser settings, menu actions and installation.

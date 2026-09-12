@@ -1,4 +1,4 @@
-"""Auth responsibilities for Tesla xBar."""
+"""Tesla OAuth protocol, token persistence and loopback authorization input."""
 import base64
 import html
 import http.server
@@ -9,9 +9,9 @@ import time
 import urllib.parse
 import webbrowser
 from . import runtime
-from .runtime import locked, read_json, save_json
-from .errors import AppError
-from .config import REGIONS, save_configuration, validate_configuration
+from .runtime import save_json
+from ..domain.errors import AppError
+from .configuration import REGIONS, validate_configuration
 from . import transport
 
 
@@ -29,8 +29,11 @@ class Keychain:
         payload = {"operation": operation, "account": account}
         if value is not None:
             payload["value"] = value
-        result = subprocess.run([str(runtime.HERE / "tesla-keychain")], input=json.dumps(payload),
-                                capture_output=True, text=True, timeout=90)
+        try:
+            result = subprocess.run([str(runtime.HERE / "tesla-keychain")], input=json.dumps(payload),
+                                    capture_output=True, text=True, timeout=90)
+        except (OSError, subprocess.SubprocessError):
+            raise AppError("Keychain is unavailable. Unlock it and try again.") from None
         if result.returncode == 3:
             return None
         if result.returncode:
@@ -82,9 +85,7 @@ class Authenticator:
             region = next((name for name, host in REGIONS.items() if base.rstrip("/") == host), None)
             if region is None:
                 return False
-            saved = save_configuration(self.config, {"region": region})
-            self.config.update(saved)
-            return True
+            return region
         except AppError:
             # Keep the configured fallback; token exchange has already succeeded.
             return False
@@ -98,16 +99,6 @@ class Authenticator:
             return set(scopes.split() if isinstance(scopes, str) else scopes)
         except (ValueError, IndexError, TypeError):
             return set()
-
-
-def reset_after_authorization():
-    # A scope upgrade must not erase the last reading while the car is asleep.
-    # The next vehicle-list response still checks the VIN before reusing it.
-    cache = read_json("cache.json")
-    for key in ("next_poll", "retry_at", "retry_status", "error", "wake_in_progress"):
-        cache.pop(key, None)
-    cache["state"] = "unknown"
-    save_json("cache.json", cache)
 
 
 def register(config):
@@ -125,12 +116,10 @@ def register(config):
         raise AppError("Tesla did not return a partner token.")
     transport.request_json(REGIONS[config["region"]] + "/api/1/partner_accounts",
                  token=token["access_token"], body={"domain": domain})
-    config["registered"] = True
-    save_configuration(config)
-    print("Region registration complete.")
 
 
-def authorize(config, launch=True):
+
+def authorize(config, complete, launch=True):
     config = validate_configuration(config)
     if not config.get("client_id") or not Keychain().get("client-secret"):
         raise AppError("Save your Client ID and Client Secret in Settings first.")
@@ -165,15 +154,7 @@ def authorize(config, launch=True):
             # Exchange before showing success; the callback server is loopback-only.
             if "code" in outcome:
                 try:
-                    with locked():
-                        tokens = transport.request_json(TOKEN_URL, form={"grant_type": "authorization_code",
-                            "client_id": config["client_id"], "client_secret": Keychain().get("client-secret"),
-                            "code": outcome.pop("code"), "audience": REGIONS[config["region"]],
-                            "redirect_uri": config["redirect_uri"]})
-                        auth = Authenticator(config)
-                        auth.save_tokens(tokens)
-                        auth.detect_region()
-                        reset_after_authorization()
+                    complete(outcome.pop("code"))
                     outcome["success"] = True
                 except AppError as exc:
                     outcome["error"] = str(exc)
@@ -213,3 +194,19 @@ def authorize(config, launch=True):
     if not outcome.get("success"):
         raise AppError(outcome.get("error", "Sign-in timed out. Connect your account again."))
     print("Tesla account connected. Tokens are stored in Keychain.")
+
+
+class OAuthIdentity:
+    def authorize(self, config, complete, launch=True):
+        authorize(config, complete, launch=launch)
+
+    def register(self, config):
+        register(config)
+
+    def exchange_code(self, config, code):
+        tokens = transport.request_json(TOKEN_URL, form={"grant_type": "authorization_code",
+            "client_id": config["client_id"], "client_secret": Keychain().get("client-secret"),
+            "code": code, "audience": REGIONS[config["region"]], "redirect_uri": config["redirect_uri"]})
+        auth = Authenticator(config)
+        auth.save_tokens(tokens)
+        return auth.detect_region() or None

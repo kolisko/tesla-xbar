@@ -5,8 +5,8 @@ import time
 import unittest
 from unittest.mock import patch
 
-from src import tesla_xbar as app
-from src.tesla_bar import api, runtime, transport
+from tests import harness as app
+from src.tesla_bar.infrastructure import api, runtime, transport
 import fcntl
 from tests.test_commands import CommandClient
 from tests.test_tesla_xbar import FakeClient, WakeClient

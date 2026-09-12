@@ -116,7 +116,7 @@ git pull --ff-only
 python3 -m scripts.install
 ```
 
-Python modules are installed as one atomic `tesla-runtime.zip` bundle beside the entrypoint; the source remains organized under `src/tesla_bar/`.
+Python modules are installed as one atomic `tesla-runtime.zip` bundle beside the entrypoint; the source has dependency-separated layers under `src/tesla_bar/`. See [Architecture](ARCHITECTURE.md).
 
 For an update that only changes Python code, icons or the wrapper, you can reuse installed helpers:
 

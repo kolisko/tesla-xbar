@@ -6,8 +6,8 @@ import time
 import unittest
 from unittest.mock import patch
 
-from src import tesla_xbar as app
-from src.tesla_bar import api, runtime, transport
+from tests import harness as app
+from src.tesla_bar.infrastructure import api, runtime, transport
 
 
 class Vault:

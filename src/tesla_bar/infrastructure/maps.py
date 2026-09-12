@@ -1,4 +1,4 @@
-"""Location responsibilities for Tesla xBar."""
+"""MapMap and Apple adapters, private PNG storage and native rendering."""
 import hashlib
 import json
 import math
@@ -10,22 +10,14 @@ import time
 import urllib.request
 from . import runtime
 from .transport import NoRedirect, retry_after_seconds
-from .models import number
+from ..domain.models import number
+from ..domain.location import coordinates
 
 
 MAP_IMAGE_LIMIT = 3_000_000
 
 
 MAP_IMAGE_FILE = "location-map.png"
-
-
-def coordinates(data):
-    if not isinstance(data, dict):
-        return None
-    lat, lon = data.get("latitude"), data.get("longitude")
-    if number(lat) and number(lon) and -90 <= lat <= 90 and -180 <= lon <= 180:
-        return lat, lon
-    return None
 
 
 def reverse_geocode(point):
@@ -41,44 +33,6 @@ def reverse_geocode(point):
     except (OSError, subprocess.SubprocessError, ValueError, AttributeError):
         pass
     return None
-
-
-def update_location(cache, response, now):
-    # Fleet API requests location_data, but returns GPS in drive_state.
-    data = response.get("drive_state")
-    point = coordinates(data)
-    if point is None:
-        cache["location_error"] = "Tesla has not provided a current location."
-        return
-    previous = cache.get("location") or {}
-    timestamp = data.get("timestamp")
-    if not number(timestamp) or timestamp <= 0 or timestamp / 1000 > now + 60:
-        cache["location_error"] = "Tesla has not provided a valid location timestamp."
-        return
-    stamp = min(now, timestamp / 1000)
-    if number(previous.get("updated_at")) and stamp < previous["updated_at"]:
-        cache["location_error"] = "Tesla returned an older location. Keeping the last known position."
-        return
-    snapshot = {"latitude": point[0], "longitude": point[1], "updated_at": stamp}
-    # An address belongs only to the exact coordinates which were looked up.
-    same_point = point == coordinates(previous)
-    if same_point and previous.get("address"):
-        snapshot["address"] = previous["address"]
-    attempted = previous.get("geocoded_at", 0)
-    snapshot["geocoded_at"] = attempted
-    if not snapshot.get("address") and now - attempted >= 60:
-        snapshot["geocoded_at"] = now
-        address = reverse_geocode(point)
-        if address:
-            snapshot["address"] = address
-    cache["location"] = snapshot
-    cache.pop("location_error", None)
-
-
-def clear_location_map(cache):
-    cache.pop("location_map", None)
-    (runtime.APP_DIR / MAP_IMAGE_FILE).unlink(missing_ok=True)
-
 
 def location_map_request(cache):
     """Private viewport/identity; never include account data in the map request."""
@@ -101,12 +55,10 @@ def location_map_request(cache):
         "pois": "0", "style": "light", "format": "png", "lang": "local"})
     return key, "https://mapmap.ai/api/static-map?" + query
 
-
 def valid_map_png(data):
     return (isinstance(data, bytes) and 24 <= len(data) <= MAP_IMAGE_LIMIT
             and data.startswith(b"\x89PNG\r\n\x1a\n") and data[12:16] == b"IHDR"
             and struct.unpack(">II", data[16:24]) == (720, 480))
-
 
 def saved_map_png(cache):
     request = location_map_request(cache)
@@ -122,7 +74,6 @@ def saved_map_png(cache):
         pass
     return None
 
-
 def download_location_map(url):
     request = urllib.request.Request(url, headers={"Accept": "image/png",
         "User-Agent": "Tesla-xBar/1.0 (+https://github.com/kolisko/tesla-xbar)"})
@@ -137,25 +88,35 @@ def download_location_map(url):
         raise ValueError("Map image could not be rendered")
     return result.stdout
 
+class AppleGeocoder:
+    def address(self, point):
+        return reverse_geocode(point)
 
-def update_location_map(cache, config):
-    """One bounded map request only when the saved vehicle position changes."""
-    if config.get("location_enabled") is not True or config.get("location_map_enabled") is not True:
-        clear_location_map(cache)
-        return
-    request = location_map_request(cache)
-    if request is None:
-        clear_location_map(cache)
-        return
-    if saved_map_png(cache) is not None:
-        return
-    previous = cache.get("location_map") or {}
-    if time.time() < previous.get("retry_at", 0):
-        return  # Honor only the provider's Retry-After, across GPS changes too.
-    state = {"key": request[0]}
-    cache["location_map"] = state
-    try:
-        data = download_location_map(request[1])
+
+class MapMapMedia:
+    def identity(self, cache):
+        request = location_map_request(cache)
+        return request[0] if request else None
+
+    def saved(self, cache):
+        return saved_map_png(cache)
+
+    def fetch(self, cache):
+        from ..domain.errors import AppError
+        from .errors import APIError
+        request = location_map_request(cache)
+        if request is None:
+            raise AppError("Map preview unavailable.")
+        try:
+            return download_location_map(request[1])
+        except urllib.error.HTTPError as exc:
+            raise APIError(exc.code, retry_after_seconds(exc.headers.get("Retry-After", ""))) from None
+        except subprocess.SubprocessError:
+            raise AppError("Map preview unavailable.") from None
+
+    def save(self, data):
+        if not valid_map_png(data):
+            raise ValueError("Unsupported map image")
         runtime.APP_DIR.mkdir(parents=True, exist_ok=True, mode=0o700)
         fd, temporary = tempfile.mkstemp(prefix=".map-", dir=runtime.APP_DIR)
         try:
@@ -165,10 +126,7 @@ def update_location_map(cache, config):
         finally:
             if os.path.exists(temporary):
                 os.unlink(temporary)
-        state["sha256"] = hashlib.sha256(data).hexdigest()
-    except urllib.error.HTTPError as exc:
-        if exc.code == 429:
-            state["retry_at"] = time.time() + retry_after_seconds(exc.headers.get("Retry-After", ""))
-        state["error"] = "Map preview unavailable. Open the position in Apple Maps."
-    except (OSError, ValueError, subprocess.SubprocessError):
-        state["error"] = "Map preview unavailable. Open the position in Apple Maps."
+        return hashlib.sha256(data).hexdigest()
+
+    def delete(self):
+        (runtime.APP_DIR / MAP_IMAGE_FILE).unlink(missing_ok=True)

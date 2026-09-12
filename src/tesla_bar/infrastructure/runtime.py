@@ -1,4 +1,4 @@
-"""Runtime responsibilities for Tesla xBar."""
+"""Private file paths, atomic JSON IO and process locks."""
 from pathlib import Path
 import contextlib
 import fcntl
@@ -10,7 +10,7 @@ import tempfile
 APP_DIR = Path(os.environ.get("TESLA_XBAR_HOME", Path.home() / "Library/Application Support/Tesla xBar"))
 
 
-HERE = Path(__file__).resolve().parents[1]
+HERE = Path(__file__).resolve().parents[2]
 if HERE.name == "tesla-runtime.zip":
     HERE = HERE.parent  # Helpers/icons live beside the atomically installed bundle.
 

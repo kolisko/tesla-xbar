@@ -1,6 +1,5 @@
-"""Models responsibilities for Tesla xBar."""
+"""Pure reading interpretation, freshness, colors and status indicators."""
 import math
-import time
 
 
 STALE_AFTER_SECONDS = 30 * 60
@@ -9,25 +8,23 @@ STALE_AFTER_SECONDS = 30 * 60
 STATUS_ICON_ORDER = ("charging", "camp", "pet", "fan", "unlocked", "sentry", "frunk", "trunk")
 
 
-VEHICLE_COMMANDS = {
-    "charge-start": ("charging-start", "Start charging", "charge_start"),
-    "charge-stop": ("charging-stop", "Stop charging", "charge_stop"),
-    "port-open": ("charge-port-open", "Open charge port", "charge_port_door_open"),
-    "port-close": ("charge-port-close", "Close charge port", "charge_port_door_close"),
-    "climate-on": ("climate-on", "Turn climate on", "auto_conditioning_start"),
-    "climate-off": ("climate-off", "Turn climate and modes off", "auto_conditioning_stop"),
-    "climate-keep": ("climate-keeper", "Keep Climate On", "set_climate_keeper_mode"),
-    "climate-camp": ("climate-keeper", "Camp Mode", "set_climate_keeper_mode"),
-    "climate-pet": ("climate-keeper", "Pet Mode", "set_climate_keeper_mode"),
-    "climate-mode-off": ("climate-keeper", "Turn modes off", "set_climate_keeper_mode"),
-    "climate-set-temp": ("climate-set-temp", "Set temperature", "set_temps"),
-    "sentry-on": ("sentry-mode", "Turn Sentry on", "set_sentry_mode"),
-    "sentry-off": ("sentry-mode", "Turn Sentry off", "set_sentry_mode"),
-    "door-lock": ("lock", "Lock vehicle", "door_lock"),
-    "door-unlock": ("unlock", "Unlock vehicle", "door_unlock"),
-    "frunk-open": ("frunk-open", "Open front trunk", "actuate_trunk"),
-    "trunk-move": ("trunk-move", "Open / close rear trunk", "actuate_trunk"),
-}
+COMMAND_LABELS = {'charge-start': 'Start charging',
+ 'charge-stop': 'Stop charging',
+ 'port-open': 'Open charge port',
+ 'port-close': 'Close charge port',
+ 'climate-on': 'Turn climate on',
+ 'climate-off': 'Turn climate and modes off',
+ 'climate-keep': 'Keep Climate On',
+ 'climate-camp': 'Camp Mode',
+ 'climate-pet': 'Pet Mode',
+ 'climate-mode-off': 'Turn modes off',
+ 'climate-set-temp': 'Set temperature',
+ 'sentry-on': 'Turn Sentry on',
+ 'sentry-off': 'Turn Sentry off',
+ 'door-lock': 'Lock vehicle',
+ 'door-unlock': 'Unlock vehicle',
+ 'frunk-open': 'Open front trunk',
+ 'trunk-move': 'Open / close rear trunk'}
 
 
 LOCK_TRUNK_COMMANDS = ("door-lock", "door-unlock", "frunk-open", "trunk-move")
@@ -36,8 +33,8 @@ LOCK_TRUNK_COMMANDS = ("door-lock", "door-unlock", "frunk-open", "trunk-move")
 VEHICLE_SCOPE_PREFIXES = ("climate-", "sentry-", "door-", "frunk-", "trunk-")
 
 
-CLIMATE_MODES = {"climate-keep": ("on", 1), "climate-pet": ("dog", 2),
-                 "climate-camp": ("camp", 3), "climate-mode-off": ("off", 0)}
+CLIMATE_MODES = {"climate-keep": "on", "climate-pet": "dog",
+                 "climate-camp": "camp", "climate-mode-off": "off"}
 
 
 def number(value):
@@ -105,18 +102,18 @@ def battery_color(cache):
     return None  # Native text color: white in the user's dark menu bar.
 
 
-def charging_is_current(cache, config=None):
+def charging_is_current(cache, *, now):
     fresh_until = cache.get("updated_at", 0) + STALE_AFTER_SECONDS
     return (cache.get("charge", {}).get("charging_state") == "Charging"
             and cache.get("state") == "online" and not cache.get("error")
-            and time.time() < fresh_until)
+            and now < fresh_until)
 
 
-def status_is_current(cache, section):
+def status_is_current(cache, section, *, now):
     data = cache.get(section) or {}
     timestamp = data.get("updated_at")
     return (cache.get("state") == "online" and not cache.get("error")
-            and number(timestamp) and 0 <= time.time() - timestamp < STALE_AFTER_SECONDS)
+            and number(timestamp) and 0 <= now - timestamp < STALE_AFTER_SECONDS)
 
 
 def climate_mode(cache):
@@ -124,9 +121,9 @@ def climate_mode(cache):
     return value.strip().lower() if isinstance(value, str) else None
 
 
-def active_status_icons(cache):
-    icons = ["charging"] if charging_is_current(cache) else []
-    if status_is_current(cache, "climate"):
+def active_status_icons(cache, *, now):
+    icons = ["charging"] if charging_is_current(cache, now=now) else []
+    if status_is_current(cache, "climate", now=now):
         mode = climate_mode(cache)
         if mode == "camp":
             icons.append("camp")
@@ -134,11 +131,11 @@ def active_status_icons(cache):
             icons.append("pet")
         if cache["climate"].get("is_climate_on") is True:
             icons.append("fan")
-    if status_is_current(cache, "vehicle_status") and cache["vehicle_status"].get("locked") is False:
+    if status_is_current(cache, "vehicle_status", now=now) and cache["vehicle_status"].get("locked") is False:
         icons.append("unlocked")
-    if status_is_current(cache, "vehicle_status") and cache["vehicle_status"].get("sentry_mode") is True:
+    if status_is_current(cache, "vehicle_status", now=now) and cache["vehicle_status"].get("sentry_mode") is True:
         icons.append("sentry")
-    if status_is_current(cache, "vehicle_status"):
+    if status_is_current(cache, "vehicle_status", now=now):
         for field, icon in (("ft", "frunk"), ("rt", "trunk")):
             if trunk_open_state(cache["vehicle_status"], field) is True:
                 icons.append(icon)

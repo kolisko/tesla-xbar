@@ -4,8 +4,8 @@ This directory contains the code installed on the user's Mac.
 
 | File | Purpose |
 | --- | --- |
-| [`tesla_xbar.py`](tesla_xbar.py) | Small CLI entrypoint and checkout import facade. |
-| [`tesla_bar/`](tesla_bar/README.md) | Modular Python runtime: authentication, API transport, settings schema, vehicle state, commands, location and menu rendering. Standard library only. |
+| [`tesla_xbar.py`](tesla_xbar.py) | Small CLI entrypoint calling the composition root. |
+| [`tesla_bar/`](tesla_bar/README.md) | Four-layer Python runtime: domain, application services/ports, presentation and infrastructure. Standard library only. |
 | [`keychain.swift`](keychain.swift) | Source for the `tesla-keychain` executable. Reads and writes credentials in macOS Keychain using JSON over stdin and stdout. |
 | [`location.swift`](location.swift) | Source for `tesla-location`: bounded Apple reverse geocoding of coordinates received over stdin. No Tesla secrets or Mac location access. |
 | [`map_image.swift`](map_image.swift) | Source for `tesla-map-image`: local AppKit composition of a blue vehicle dot on MapMap image bytes, returning a 144 DPI PNG. No network or Mac GPS access. |

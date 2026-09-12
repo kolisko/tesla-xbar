@@ -4,6 +4,8 @@ These tests use fake Tesla clients and temporary local profiles. They do not req
 
 | File | Coverage |
 | --- | --- |
+| [`test_layers.py`](test_layers.py) | Enforced import directions and acyclic dependencies; use cases with in-memory ports, pure rendering, account-renewal races and installed zip entrypoint. |
+| [`harness.py`](harness.py) | Test-only composition and raw-fixture compatibility; uses production services/rendering and is never installed. |
 | [`test_architecture.py`](test_architecture.py) | Shared configuration, credential updates, region verification/allowlist, connection reuse, proxy behavior and command non-replay. A short-lived loopback fixture verifies real TCP connection reuse without contacting Tesla. |
 | [`test_tesla_xbar.py`](test_tesla_xbar.py) | Refresh behavior, token renewal, range and percentage display, colors, cached readings and manual wake. |
 | [`test_commands.py`](test_commands.py) | Charging and port commands, required permissions, signed command handling and target validation. |
