@@ -8,6 +8,7 @@ import unittest
 from unittest.mock import patch
 
 from src import tesla_xbar as app
+from src.tesla_bar import api, runtime, transport
 from tests.test_commands import CommandClient
 from tests.test_tesla_xbar import Vault
 
@@ -55,10 +56,10 @@ class ClimaTests(unittest.TestCase):
         self.addCleanup(directory.cleanup)
         self.root = Path(directory.name)
         for name, value in (("APP_DIR", self.root), ("HERE", self.root)):
-            patcher = patch.object(app, name, value)
+            patcher = patch.object(runtime, name, value)
             patcher.start()
             self.addCleanup(patcher.stop)
-        network = patch.object(app, "request_json", side_effect=AssertionError("Real API access is forbidden in tests"))
+        network = patch.object(transport, "request_json", side_effect=AssertionError("Real API access is forbidden in tests"))
         network.start()
         self.addCleanup(network.stop)
         self.config = app.DEFAULTS | {"client_id": "example", "vin": "EXAMPLEVIN"}
@@ -137,7 +138,7 @@ class ClimaTests(unittest.TestCase):
 
     def test_explicit_mode_can_wake_once_but_refresh_never_changes_climate(self):
         client = ClimateClient(state="asleep")
-        with patch.object(app.time, "sleep"):
+        with patch.object(time, "sleep"):
             app.run_vehicle_command(self.config, "climate-camp", client)
         self.assertEqual(client.wakes, ["EXAMPLEVIN"])
         self.assertEqual([item[1] for item in client.commands], ["climate-camp"])
@@ -177,7 +178,7 @@ class ClimaTests(unittest.TestCase):
                   ("climate-set-temp", ["climate-set-temp", "22.5C"], {"driver_temp": 22.5, "passenger_temp": 22.5}, 22.5)]
         for command, arguments, body, temperature in cases:
             with self.subTest(command=command):
-                with patch.object(app.subprocess, "run", return_value=subprocess.CompletedProcess([], 0)) as run:
+                with patch.object(subprocess, "run", return_value=subprocess.CompletedProcess([], 0)) as run:
                     client.vehicle_command("EXAMPLEVIN", command, {"signing_required": True, "key_paired": True}, temperature)
                 args, kwargs = run.call_args
                 self.assertEqual(args[0][-len(arguments):], arguments)
@@ -202,12 +203,12 @@ class ClimaTests(unittest.TestCase):
         parameters = dict(part.split("=", 1) for part in shlex.split(line.split(" | ")[1]))
         arguments = [parameters[f"param{i}"] for i in range(1, 7)]
         self.assertEqual(arguments, ["command", "climate-set-temp", "--temperature", "22.5", "--vin", "EXAMPLEVIN"])
-        with patch.object(app, "Client", return_value=client), patch("sys.argv", ["plugin"] + arguments), patch("sys.stdout", new_callable=io.StringIO):
+        with patch.object(api, "Client", return_value=client), patch("sys.argv", ["plugin"] + arguments), patch("sys.stdout", new_callable=io.StringIO):
             self.assertEqual(app.main(), 0)
         self.assertEqual(client.commands, [("EXAMPLEVIN", "climate-set-temp", 22.5)])
         # The same open menu must not control a newly selected vehicle.
         app.save_json("config.json", self.config | {"vin": "OTHER"})
-        with patch.object(app, "Client", return_value=client), patch("sys.argv", ["plugin"] + arguments), patch("sys.stdout", new_callable=io.StringIO):
+        with patch.object(api, "Client", return_value=client), patch("sys.argv", ["plugin"] + arguments), patch("sys.stdout", new_callable=io.StringIO):
             self.assertEqual(app.main(), 0)
         self.assertEqual(len(client.commands), 1)
         self.assertIn("selected vehicle has changed", app.read_json("command-result.json")["message"])

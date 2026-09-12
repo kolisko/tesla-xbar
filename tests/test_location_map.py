@@ -12,6 +12,8 @@ from pathlib import Path
 from unittest.mock import patch, MagicMock
 
 from src import tesla_xbar as app
+from src.tesla_bar import location, runtime
+import urllib.request
 from tests.test_sentry_location import FeatureClient
 
 
@@ -27,13 +29,13 @@ class LocationMapTests(unittest.TestCase):
         temporary = tempfile.TemporaryDirectory()
         self.addCleanup(temporary.cleanup)
         self.root = Path(temporary.name)
-        mock = patch.object(app, 'APP_DIR', self.root)
+        mock = patch.object(runtime, 'APP_DIR', self.root)
         mock.start(); self.addCleanup(mock.stop)
         self.config = app.DEFAULTS | {'location_enabled': True, 'location_map_enabled': True}
         self.cache = {'vin': 'EXAMPLEVIN', 'state': 'online', 'location': {
             'latitude': 40.758, 'longitude': -73.9855, 'updated_at': time.time(), 'address': 'Example Street'}}
         self.png = image()
-        mock = patch.object(app, 'download_location_map', return_value=self.png)
+        mock = patch.object(location, 'download_location_map', return_value=self.png)
         self.download = mock.start(); self.addCleanup(mock.stop)
 
     def test_opt_in_missing_or_revoked_location_clears_map_without_requests(self):
@@ -102,7 +104,7 @@ class LocationMapTests(unittest.TestCase):
     def test_shared_tesla_read_updates_map_without_extra_vehicle_calls_or_wake(self):
         config = self.config | {'client_id': 'example', 'vin': 'EXAMPLEVIN'}
         client = FeatureClient()
-        with patch.object(app, 'reverse_geocode', return_value='Example Street'):
+        with patch.object(location, 'reverse_geocode', return_value='Example Street'):
             cache = app.fetch_state(config, client)
             self.assertEqual(len(client.calls), 2)
             self.assertIsNotNone(app.saved_map_png(cache))
@@ -131,8 +133,8 @@ class MapTransportTests(unittest.TestCase):
         response.read.return_value = raw
         opener = MagicMock()
         opener.open.return_value = response
-        with patch.object(app.urllib.request, 'build_opener', return_value=opener) as build, \
-             patch.object(app.subprocess, 'run', return_value=subprocess.CompletedProcess([], 0, raw)) as run:
+        with patch.object(urllib.request, 'build_opener', return_value=opener) as build, \
+             patch.object(subprocess, 'run', return_value=subprocess.CompletedProcess([], 0, raw)) as run:
             self.assertEqual(app.download_location_map('https://mapmap.ai/api/static-map?bbox=example'), raw)
             self.assertIs(build.call_args.args[0], app.NoRedirect)
             request = opener.open.call_args.args[0]

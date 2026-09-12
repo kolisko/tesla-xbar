@@ -4,6 +4,7 @@ These tests use fake Tesla clients and temporary local profiles. They do not req
 
 | File | Coverage |
 | --- | --- |
+| [`test_architecture.py`](test_architecture.py) | Shared configuration, credential updates, region verification/allowlist, connection reuse, proxy behavior and command non-replay. A short-lived loopback fixture verifies real TCP connection reuse without contacting Tesla. |
 | [`test_tesla_xbar.py`](test_tesla_xbar.py) | Refresh behavior, token renewal, range and percentage display, colors, cached readings and manual wake. |
 | [`test_commands.py`](test_commands.py) | Charging and port commands, required permissions, signed command handling and target validation. |
 | [`test_locks_trunks.py`](test_locks_trunks.py) | Grouped lock/trunk menu, signed and legacy commands, scoped access, vehicle binding, cached closure readings, one-shot toggles and acknowledgement versus observed state. |

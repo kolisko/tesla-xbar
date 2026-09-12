@@ -18,6 +18,8 @@ class InstallTests(unittest.TestCase):
             path.mkdir()
         (self.source / "src").mkdir()
         (self.source / "src" / "tesla_xbar.py").write_text("# generic code\n")
+        (self.source / "src" / "tesla_bar").mkdir()
+        (self.source / "src" / "tesla_bar" / "__init__.py").write_text("# package\n")
         (self.source / "src" / "icons").mkdir()
         (self.source / "src" / "icons" / "fan.png").write_bytes(b"example icon")
         for name in ("tesla-control", "tesla-keychain", "tesla-location", "tesla-map-image"):

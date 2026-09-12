@@ -64,7 +64,8 @@ xBar schedules the plugin and displays its text output. The Tesla integration ru
 flowchart TD
     X["xBar: interval from plugin filename"] --> W["tesla-battery.1m.sh"]
     W --> L["tesla-action.sh"]
-    L --> P["tesla_xbar.py: API, login and menu"]
+    L --> P["tesla_xbar.py → tesla_bar CLI"]
+    P --> R["Auth, API, vehicle state, commands and menu modules"]
     P <--> F["Tesla Fleet API"]
     P <--> K["tesla-keychain: Swift helper"]
     K <--> V["macOS Keychain"]
@@ -81,7 +82,8 @@ flowchart TD
 | --- | --- |
 | `tesla-battery.1m.sh` | Small shell entry point in xBar's plugin directory. Its filename supplies the refresh interval. |
 | `tesla-action.sh` | Generated shell launcher that uses the Python interpreter selected during installation. Menu actions also call this launcher. |
-| [`tesla_xbar.py`](src/tesla_xbar.py) | Python standard-library application: Fleet API requests, OAuth and token renewal, cached readings, menu rendering and action handling. |
+| [`tesla_xbar.py`](src/tesla_xbar.py) | Small Python entrypoint. Delegates to the modular runtime; retains checkout imports for existing tests and tools. |
+| [`tesla_bar/`](src/tesla_bar/README.md) | Standard-library modules for authentication, HTTPS transport, vehicle state, commands, location, menu output and a shared settings schema. Installed together as `tesla-runtime.zip` so an update replaces the whole module bundle atomically. |
 | [`icons/`](src/icons/README.md) | Prebuilt monochrome image strips for charging, Camp/Pet modes, running climate, an unlocked vehicle, Sentry and open front/rear trunks. Python includes the matching PNG in xBar's output; macOS supplies its tint. No runtime icon renderer is needed. |
 | `tesla-keychain`, built from [`keychain.swift`](src/keychain.swift) | Small Swift executable that accesses macOS Keychain. Secrets are passed to it through stdin. |
 | `tesla-location`, built from [`location.swift`](src/location.swift) | Short-lived Swift helper using Apple’s reverse-geocoding service. Receives only vehicle coordinates over stdin and returns a postal address. It never requests the Mac’s location. |
@@ -89,13 +91,15 @@ flowchart TD
 | `tesla-control`, built by [`build_commands.py`](scripts/build_commands.py) | Tesla's Go command tool, built from a pinned revision with a small [climate-keeper CLI adapter](src/commands/README.md). Python invokes it for commands requiring vehicle signatures. The SDK checkout remains unchanged. |
 | [`install.py`](scripts/install.py) | Builds the helpers, installs the runtime and launchers, and creates a signing key for a new profile. Updates reuse the existing private profile. |
 
+Direct Tesla HTTPS requests reuse one connection per origin during a single plugin invocation. Connections close when the action finishes; no process is kept alive between xBar runs. Configured HTTP proxies retain the previous urllib behavior. Network failures do not automatically replay commands, and redirects never forward credentials. An explicitly rejected 401 can renew the token and retry once.
+
 A normal refresh checks vehicle availability and reads live data when available; otherwise it retains the last known reading. Wake is a separate, explicit action. The Python application sends ordinary API requests itself and delegates commands requiring signatures to the Go helper.
 
 The same `vehicle_data` request includes `charge_state`, `gui_settings`, `climate_state` and `vehicle_state`. Climate, lock and trunk readings require no additional API calls or permissions beyond the existing vehicle-data access. Saved climate fields are limited to the keeper mode, on/off state, inside/outside temperatures, both front temperature settings and the vehicle's available temperature limits; the saved vehicle fields are `locked`, `sentry_mode`, `ft` (front trunk) and `rt` (rear trunk). Each section keeps its own reading timestamp. Clima, Sentry, lock and trunk actions use the existing `vehicle_cmds` scope and paired signing key, where required. See [Tesla's documented commands](https://developer.tesla.com/docs/fleet-api/endpoints/vehicle-commands).
 
 When Location is enabled and authorized, the same request also includes `location_data`; the coordinates arrive in `drive_state`. Only latitude, longitude, their timestamp and the matching reverse-geocoded address are saved. Missing or denied location access does not block battery or climate data. Address lookup runs only when needed, at most once per minute; it has an eight-second deadline and no background daemon. The Apple Maps link uses coordinates rather than searching by address.
 
-Browser sign-in starts a temporary HTTP listener on the Mac's loopback interface, using the configured callback port. It closes when sign-in completes or times out. Later refreshes renew tokens as needed without opening a browser. The public HTTPS site serves only the **public key**: it does not relay the callback, run the plugin or store credentials.
+Browser sign-in starts a temporary HTTP listener on the Mac's loopback interface, using the configured callback port. It closes when sign-in completes or times out. After successful sign-in, one account-level `/api/1/users/region` lookup verifies the regional API host against a fixed Tesla allowlist. If lookup fails, the configured region remains the fallback. Routine refreshes do not repeat this lookup. Later refreshes renew tokens as needed without opening a browser. The public HTTPS site serves only the **public key**: it does not relay the callback, run the plugin or store credentials.
 
 **Location → Enable map preview** adds a 360 × 240 point map directly to the submenu. At each normal refresh, Python requests a MapMap image only if the saved GPS position changed or its cached image is missing. POIs and provider markers are disabled; `tesla-map-image` draws the blue dot locally. The download has a twenty-second timeout and the renderer a five-second timeout. No extra Tesla request, wake or background worker is needed. The image is bound to the saved position and selected vehicle: an outdated or unavailable image is omitted while the Apple Maps link remains usable. Offline/asleep vehicles retain the last known map and original location timestamp. The provider's Retry-After is honored when present.
 
@@ -105,7 +109,7 @@ Each directory has a Markdown guide describing its contents. Most use `README.md
 
 | Directory | Contents |
 | --- | --- |
-| [`src/`](src/README.md) | Python application, Swift Keychain helper, [Go CLI adapter](src/commands/README.md) and [status icon assets](src/icons/README.md). |
+| [`src/`](src/README.md) | Modular Python application, Swift Keychain helper, [Go CLI adapter](src/commands/README.md) and [status icon assets](src/icons/README.md). |
 | [`scripts/`](scripts/README.md) | Installer, pinned command-helper build, privacy check and preview generator. |
 | [`tests/`](tests/README.md) | Automated tests using fake Tesla clients and temporary profiles. |
 | [`examples/`](examples/README.md) | Placeholder configuration for your own setup. |
@@ -136,13 +140,15 @@ Choose **Settings…** in the plugin menu to open the interactive Terminal promp
 
 | Setting | How it is configured |
 | --- | --- |
-| Client ID, domain, region and callback | **Settings…** writes `client_id`, `domain`, `region` and `redirect_uri` to `config.json`. Region defaults to `eu` (`na` and `cn` are also supported); the default callback is `http://localhost:8765/callback`. |
+| Client ID, domain, region and callback | **Settings…** writes `client_id`, `domain`, `region` and `redirect_uri` to `config.json`. The initial region defaults to `eu` (choices: `eu`, `na`, `cn`) and is verified after sign-in; the default callback is `http://localhost:8765/callback`. |
 | Client Secret and account access | **Settings…** saves the secret in Keychain. **Connect Tesla account…** obtains the access and refresh tokens; renewal is automatic while authorization remains valid. |
 | Vehicle | **Select vehicle** appears for multiple vehicles and saves the selected `vin` in `config.json`. |
 | Location | **Location → Enable Location…** sets `location_enabled` to `true` and requests `vehicle_location` consent. This shares vehicle coordinates with Apple to find an address. Default is disabled. **Disable Location** stops collection and clears the saved location/address; revoke the Tesla grant separately if desired. |
 | Map preview | **Location → Enable map preview** sets `location_map_enabled` to `true`. Default is disabled. It shares a viewport centered on the vehicle with MapMap. **Hide map preview** stops map requests and removes the cached map. No MapMap account or API key is needed. |
 | Range or percentage | **Menu bar display** saves `display_mode` as `range` (default) or `percent`. This is a local choice, independent of the Tesla mobile app's display preference. |
 | Refresh interval | Managed by xBar's plugin filename: `tesla-battery.1m.sh` runs every minute; `tesla-battery.5m.sh` runs every five minutes. Change it through xBar's plugin management. There is no separate interval in `config.json`. |
+
+The shared [`settings schema`](src/tesla_bar/config.py) defines defaults, menu choices and validation for profile loading, the Terminal prompts, the optional local browser form (`tesla-action.sh provision`), and installer checks. Neither installer path rewrites existing settings. Saving the same application settings preserves its cached readings; changing Client ID requires the new app’s secret and clears the old login/vehicle selection.
 
 [`config.example.json`](examples/config.example.json) shows placeholder settings for reference. It is not the live configuration file and is not automatically copied over your profile. The color thresholds (orange below 350 km, red below 300 km when unplugged) are currently code constants, not configurable JSON fields.
 

@@ -9,6 +9,7 @@ import unittest
 from unittest.mock import patch
 
 from src import tesla_xbar as app
+from src.tesla_bar import runtime
 from tests.test_tesla_xbar import FakeClient
 
 
@@ -28,7 +29,7 @@ class StatusIconTests(unittest.TestCase):
     def setUp(self):
         directory = tempfile.TemporaryDirectory()
         self.addCleanup(directory.cleanup)
-        self.home = patch.object(app, "APP_DIR", Path(directory.name))
+        self.home = patch.object(runtime, "APP_DIR", Path(directory.name))
         self.home.start()
         self.addCleanup(self.home.stop)
         self.now = float(int(time.time()))
@@ -77,7 +78,7 @@ class StatusIconTests(unittest.TestCase):
     def test_each_section_uses_its_own_timestamp(self):
         cache = self.cache()
         cache["climate"]["updated_at"] = self.now - app.STALE_AFTER_SECONDS
-        with patch.object(app.time, "time", return_value=self.now):
+        with patch.object(time, "time", return_value=self.now):
             self.assertEqual(app.active_status_icons(cache), ["unlocked"])
             self.assertIn("Last known climate mode: Camp Mode", app.status_menu_lines(cache))
             cache["vehicle_status"]["updated_at"] = self.now + 1
@@ -129,7 +130,7 @@ class StatusIconTests(unittest.TestCase):
         title = app.render(cache, self.config).splitlines()[0]
         self.assertTrue(title.startswith("360 km | color=#32CD66 templateImage="))
         self.assertEqual(base64.b64decode(title.split("templateImage=")[1]),
-                         (app.HERE / "icons" / "camp-fan-unlocked.png").read_bytes())
+                         (runtime.HERE / "icons" / "camp-fan-unlocked.png").read_bytes())
         self.assertIn("Climate mode: Camp Mode", app.render(cache, self.config))
         self.assertTrue(app.render(cache, self.config | {"display_mode": "percent"}).startswith("73% |"))
         cache["charge"]["charging_state"] = "Charging"
@@ -137,7 +138,7 @@ class StatusIconTests(unittest.TestCase):
         self.assertTrue(title.startswith("360 km | color=#32CD66 templateImage="))
         self.assertNotIn("⚡", title)
         self.assertEqual(base64.b64decode(title.split("templateImage=")[1]),
-                         (app.HERE / "icons" / "charging-camp-fan-unlocked.png").read_bytes())
+                         (runtime.HERE / "icons" / "charging-camp-fan-unlocked.png").read_bytes())
 
     def test_all_valid_combinations_are_retina_pngs_at_menu_bar_size(self):
         combinations = []
@@ -205,7 +206,7 @@ class StatusIconTests(unittest.TestCase):
             menu = app.render(cache, self.config | {"display_mode": mode})
             image = menu.splitlines()[0].split("templateImage=")[1]
             self.assertEqual(base64.b64decode(image),
-                             (app.HERE / "icons/charging-frunk-trunk.png").read_bytes())
+                             (runtime.HERE / "icons/charging-frunk-trunk.png").read_bytes())
         client.sections["vehicle_state"] = {"locked": True, "ft": 0, "timestamp": self.now * 1000}
         cache = app.fetch_state(self.config, client)
         self.assertEqual(app.active_status_icons(cache), ["charging"])
@@ -213,7 +214,7 @@ class StatusIconTests(unittest.TestCase):
         self.assertIn("--Rear trunk: unavailable", app.render(cache, self.config))
 
     def test_missing_asset_keeps_textual_status_available(self):
-        with patch.object(app, "HERE", app.APP_DIR):
+        with patch.object(runtime, "HERE", runtime.APP_DIR):
             menu = app.render(self.cache(), self.config)
         self.assertNotIn("templateImage=", menu)
         self.assertIn("Climate mode: Camp Mode", menu)

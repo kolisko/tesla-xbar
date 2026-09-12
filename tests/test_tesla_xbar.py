@@ -7,6 +7,7 @@ import unittest
 from unittest.mock import patch
 
 from src import tesla_xbar as app
+from src.tesla_bar import api, runtime, transport
 
 
 class Vault:
@@ -58,7 +59,7 @@ class WakeClient(FakeClient):
 class Tests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
-        self.home = patch.object(app, "APP_DIR", Path(self.temp.name))
+        self.home = patch.object(runtime, "APP_DIR", Path(self.temp.name))
         self.home.start()
         self.config = app.DEFAULTS | {"client_id": "example", "vin": "EXAMPLEVIN"}
 
@@ -98,7 +99,7 @@ class Tests(unittest.TestCase):
     def test_rotation_saved_before_next_use(self):
         vault = Vault({"access_token": "old", "refresh_token": "refresh-old", "expires_at": 0})
         client = app.Client(self.config, vault)
-        with patch.object(app, "request_json", return_value={"access_token": "new", "refresh_token": "refresh-new", "expires_in": 3600}) as http:
+        with patch.object(transport, "request_json", return_value={"access_token": "new", "refresh_token": "refresh-new", "expires_in": 3600}) as http:
             self.assertEqual(client.access_token(), "new")
             self.assertEqual(client.access_token(), "new")
         self.assertEqual(http.call_count, 1)
@@ -113,7 +114,7 @@ class Tests(unittest.TestCase):
         app.save_json("cache.json", first | {"next_poll": time.time() + 1200})
         client.level = 71
         for command in ("menu", "refresh"):
-            with patch.object(app, "Client", return_value=client), patch("sys.argv", ["tesla_xbar.py", command]), patch("sys.stdout", new_callable=io.StringIO):
+            with patch.object(api, "Client", return_value=client), patch("sys.argv", ["tesla_xbar.py", command]), patch("sys.stdout", new_callable=io.StringIO):
                 self.assertEqual(app.main(), 0)
             fresh = app.read_json("cache.json")
             self.assertEqual(fresh["charge"]["battery_level"], client.level)
@@ -139,7 +140,7 @@ class Tests(unittest.TestCase):
         vault = Vault({"access_token": "old", "refresh_token": "refresh-old", "expires_at": time.time() + 3600})
         client = app.Client(self.config, vault)
         responses = [app.APIError(401), {"access_token": "new", "refresh_token": "refresh-new"}, {"response": []}]
-        with patch.object(app, "request_json", side_effect=responses) as http:
+        with patch.object(transport, "request_json", side_effect=responses) as http:
             self.assertEqual(client.get("/api/1/vehicles"), {"response": []})
         self.assertEqual(http.call_count, 3)
 
@@ -207,7 +208,7 @@ class Tests(unittest.TestCase):
         vault = Vault({"access_token": "token", "expires_at": time.time() + 3600})
         client = app.Client(self.config | {"monthly_request_limit": 1}, vault)
         app.save_json("usage.json", {"requests": 4000})
-        with patch.object(app, "request_json", return_value={"response": []}) as http:
+        with patch.object(transport, "request_json", return_value={"response": []}) as http:
             client.get("/api/1/vehicles")
         http.assert_called_once()
         self.assertNotIn("4000", app.render({}, self.config))
@@ -216,11 +217,11 @@ class Tests(unittest.TestCase):
 
     def test_runtime_files_private(self):
         app.save_json("cache.json", {"charge": {"battery_level": 10}})
-        self.assertEqual((app.APP_DIR / "cache.json").stat().st_mode & 0o777, 0o600)
+        self.assertEqual((runtime.APP_DIR / "cache.json").stat().st_mode & 0o777, 0o600)
 
     def test_manual_wake_once_then_wait_for_online_and_read(self):
         client = WakeClient()
-        with patch.object(app.time, "sleep"):
+        with patch.object(time, "sleep"):
             cache = app.wake_and_refresh(self.config, client=client)
         self.assertEqual(client.wakes, ["EXAMPLEVIN"])
         self.assertEqual(cache["state"], "online")
@@ -265,7 +266,7 @@ class Tests(unittest.TestCase):
         app.save_json("cache.json", {"vin": "EXAMPLEVIN", "state": "asleep", "retry_status": 408,
                                     "error": "Vehicle asleep", "retry_at": time.time() + 1200})
         client = WakeClient()
-        with patch.object(app.time, "sleep"):
+        with patch.object(time, "sleep"):
             cache = app.wake_and_refresh(self.config, client=client)
         self.assertNotIn("error", cache)
         self.assertEqual(client.wakes, ["EXAMPLEVIN"])
@@ -279,7 +280,7 @@ class Tests(unittest.TestCase):
     def test_wake_post_does_not_retry_uncertain_network_result(self):
         vault = Vault({"access_token": "token", "expires_at": time.time() + 3600})
         client = app.Client(self.config, vault)
-        with patch.object(app, "request_json", side_effect=app.AppError("Network unavailable")) as http:
+        with patch.object(transport, "request_json", side_effect=app.AppError("Network unavailable")) as http:
             with self.assertRaises(app.AppError):
                 client.wake("EXAMPLEVIN")
         http.assert_called_once_with(app.REGIONS["eu"] + "/api/1/vehicles/EXAMPLEVIN/wake_up", token="token", body={})
@@ -313,7 +314,7 @@ class Tests(unittest.TestCase):
     def test_published_display_is_private_and_contains_no_full_vehicle_data(self):
         cache = app.fetch_state(self.config, client=FakeClient())
         app.publish_display(cache, self.config, app.render(cache, self.config))
-        display = app.APP_DIR / "display.txt"
+        display = runtime.APP_DIR / "display.txt"
         self.assertEqual(display.stat().st_mode & 0o777, 0o600)
         self.assertTrue(display.read_text().startswith("TESLA_XBAR_DISPLAY_V1 "))
         self.assertNotIn("latitude", display.read_text())
