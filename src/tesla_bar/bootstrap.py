@@ -12,6 +12,7 @@ from .infrastructure.profile import FileProfile, SystemClock, KeychainVault, Set
 from .infrastructure.gateway import TeslaGateway
 from .infrastructure.maps import MapMapMedia, AppleGeocoder
 from .infrastructure.transport import session_scope
+from .infrastructure.visibility import DesktopVisibility
 from .presentation.menu import MenuRenderer
 from .presentation.settings_form import settings_fields_html
 from .presentation.cli import run
@@ -52,7 +53,7 @@ def build():
     commands = CommandService(profile, clock, vehicles, TeslaGateway)
     settings = SettingsService(profile, KeychainVault())
     accounts = AccountService(profile, auth.OAuthIdentity(), InteractiveSettings(profile, settings))
-    service = PluginService(profile, clock, accounts, vehicles, commands, location)
+    service = PluginService(profile, clock, accounts, vehicles, commands, location, DesktopVisibility())
     return service, lambda result: present(result, profile, clock, maps)
 
 

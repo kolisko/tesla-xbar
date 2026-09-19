@@ -14,6 +14,7 @@ Contents of this directory. See [Architecture](../../../docs/ARCHITECTURE.md) fo
 | [`configuration.py`](configuration.py) | Strict profile JSON loading/saving; regional Tesla endpoint allowlist. |
 | [`runtime.py`](runtime.py) | Local paths, atomic private JSON IO and process locks. |
 | [`maps.py`](maps.py) | Apple geocoder, MapMap viewport/download, validated private PNG storage and native map renderer. |
+| [`visibility.py`](visibility.py) | Bounded native desktop probe; normalize visibility and pause polling on probe failures. |
 | [`display.py`](display.py) | Icon bytes and atomic display-snapshot publication. |
 | [`settings_input.py`](settings_input.py) | Terminal prompts and temporary loopback form server with supplied validation/save callbacks. |
 | [`__init__.py`](__init__.py) | Package marker. |

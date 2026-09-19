@@ -11,6 +11,8 @@ Run these commands from the repository root.
 | [`render_previews.py`](render_previews.py) | Generate SVG documentation illustrations using fictional vehicle data. | `python3 scripts/render_previews.py` |
 | [`render_status_icons.cjs`](render_status_icons.cjs) | Generate Retina PNG status icons and their fictional documentation preview from the SVG sources in `src/icons/`. Development only; requires Node.js and `sharp`. | `node scripts/render_status_icons.cjs` |
 
+The desktop-visibility update adds `tesla-visibility`; a runtime-only upgrade builds this small helper if it is missing, without rebuilding the Tesla SDK. New profiles default to `5m`; existing wrapper names remain unchanged.
+
 For runtime and icon updates with unchanged helpers, use `python3 -m scripts.install --runtime-only`. The installer and command builder run as Python modules; `__init__.py` provides their package. Use `python3 -m scripts.install --help` for installer options.
 
 The Location map update needs a full installation to compile `src/map_image.swift` as `tesla-map-image`. The installed helper uses AppKit; no Python imaging library, Node.js runtime or map API key is needed.

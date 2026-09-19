@@ -18,6 +18,20 @@ class Clock(Protocol):
     def sleep(self, seconds: float) -> None: ...
 
 
+class Visibility(Enum):
+    VISIBLE = "visible"
+    DISPLAY_OFF = "display_off"
+    LOCKED = "locked"
+    SCREENSAVER = "screensaver"
+    INACTIVE = "inactive"
+    BAR_HIDDEN = "bar_hidden"
+    UNKNOWN = "unknown"
+
+
+class Desktop(Protocol):
+    def state(self) -> Visibility: ...
+
+
 class Profile(Protocol):
     def read(self, record: Record) -> dict: ...
     def write(self, record: Record, value: dict) -> None: ...

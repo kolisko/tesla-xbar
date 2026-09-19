@@ -65,8 +65,19 @@ def build_helpers(source):
     map_image = build / "tesla-map-image"
     subprocess.run(["/usr/bin/swiftc", "-module-cache-path", str(build / "module-cache"),
                     str(source / "src" / "map_image.swift"), "-o", str(map_image)], check=True)
+    visibility = build_visibility(source)
     return {"tesla-keychain": binary, "tesla-location": location, "tesla-map-image": map_image,
+            "tesla-visibility": visibility,
             "tesla-control": build_commands()}
+
+
+def build_visibility(source):
+    build = source / "build"
+    build.mkdir(exist_ok=True)
+    binary = build / "tesla-visibility"
+    subprocess.run(["/usr/bin/swiftc", "-module-cache-path", str(build / "module-cache"),
+                    str(source / "src" / "visibility.swift"), "-o", str(binary)], check=True)
+    return binary
 
 
 def runtime_bundle(source):
@@ -87,11 +98,14 @@ def install(source, target, plugins, *, runtime_only=False, python=None):
     active = sorted(plugins.glob("tesla-battery.*.sh"))
     if len(active) > 1:
         raise RuntimeError("Multiple active Tesla plugins found. Keep only one in xBar and run the installer again.")
-    plugin = active[0] if active else plugins / "tesla-battery.1m.sh"
+    plugin = active[0] if active else plugins / "tesla-battery.5m.sh"
     bundle = runtime_bundle(source)
     helpers = {} if runtime_only else build_helpers(source)
     if runtime_only and not all((target / name).is_file() for name in ("tesla-keychain", "tesla-control", "tesla-location", "tesla-map-image")):
         raise RuntimeError("Helpers are missing. Run the installer without --runtime-only first.")
+    if runtime_only and not (target / "tesla-visibility").is_file():
+        # Upgrade old profiles without rebuilding the Tesla SDK or touching Keychain.
+        helpers["tesla-visibility"] = build_visibility(source)
     target.mkdir(parents=True, exist_ok=True, mode=0o700)
     plugins.mkdir(parents=True, exist_ok=True)
     os.chmod(target, 0o700)

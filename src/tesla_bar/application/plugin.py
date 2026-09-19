@@ -1,5 +1,5 @@
 """Application entry use cases. No UI syntax, network, paths or subprocesses."""
-from .ports import Profile, Clock, AccountFlow, Request, Result, Record
+from .ports import Profile, Clock, AccountFlow, Request, Result, Record, Desktop, Visibility
 from .vehicle import VehicleService
 from .commands import CommandService
 from .location import LocationService
@@ -8,9 +8,11 @@ from ..domain.settings import DEFAULTS, SETTINGS
 
 class PluginService:
     def __init__(self, profile: Profile, clock: Clock, accounts: AccountFlow,
-                 vehicles: VehicleService, commands: CommandService, location: LocationService):
+                 vehicles: VehicleService, commands: CommandService, location: LocationService,
+                 desktop: Desktop):
         self.profile, self.clock, self.accounts = profile, clock, accounts
         self.vehicles, self.commands, self.location = vehicles, commands, location
+        self.desktop = desktop
 
     def handle(self, args: Request):
         config = dict(DEFAULTS)
@@ -100,11 +102,17 @@ class PluginService:
                 if not config.get("client_id"):
                     cache = {"error": "Complete setup in the Tesla Developer portal and Settings."}
                 else:
-                    try:
-                        with self.profile.locked(blocking=False):
-                            cache = self.vehicles.fetch_state(config)
-                    except BlockingIOError:
-                        cache = self.profile.read(Record.STATE)
+                    visibility = self.desktop.state()
+                    if visibility != Visibility.VISIBLE:
+                        # Return a presentation-only copy. No Tesla client, token
+                        # renewal, map lookup or timestamp/cache mutation occurs.
+                        cache = self.profile.read(Record.STATE) | {"polling_paused": visibility.value}
+                    else:
+                        try:
+                            with self.profile.locked(blocking=False):
+                                cache = self.vehicles.fetch_state(config)
+                        except BlockingIOError:
+                            cache = self.profile.read(Record.STATE)
                 result.cache = cache
         except BlockingIOError:
             cache = self.profile.read(Record.STATE)

@@ -15,4 +15,4 @@ so its source parser analyzes the complete CLI package built for installation.
 
 The [security policy](../SECURITY.md) describes the checks and Swift analysis timing. Workflows use fake accounts and must not receive real Tesla credentials.
 
-Both Swift helpers (`keychain.swift` and `location.swift`) are compiled in the macOS build and CodeQL Swift analysis.
+All four Swift helpers (`keychain.swift`, `location.swift`, `map_image.swift` and `visibility.swift`) are compiled in the macOS build and CodeQL Swift analysis.

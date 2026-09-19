@@ -159,3 +159,9 @@ Offline/asleep vehicles retain the last known position and its original time. If
 The map preview uses `location_map_enabled` (default `false`) and the `tesla-map-image` helper. Run the full installer when upgrading to this feature. A changed saved position causes at most one MapMap request during the normal plugin refresh; the same position reuses its cached image. No extra Tesla request or wake is sent. If map retrieval fails after movement, the previous map is hidden rather than presented as the new position; the Apple Maps link remains. The map uses the location timestamp already shown in the submenu, including while the vehicle sleeps.
 
 **Hide map preview** deletes `location-map.png` and stops map requests, while retaining the address and Apple Maps link. **Disable Location** also deletes the map. Map images and menu snapshots are private location data; never attach them to a public issue.
+
+## Refresh only while the desktop is visible
+
+New installations refresh every five minutes. Change the interval through xBar's plugin management; the installer preserves existing intervals. `Refresh now` follows the same visibility check. Automatic requests pause while displays are asleep, your session is locked/inactive, a screen saver covers a display, or macOS reports the menu bar hidden. Saved readings and their original timestamps remain available. Updates resume at the next xBar run after the desktop is visible again (up to the configured interval), or when you choose **Refresh now**.
+
+If the menu reports **desktop visibility unavailable**, update the installation so `tesla-visibility` is present. The helper needs no Screen Recording or Accessibility permission. A failed probe pauses routine requests; explicit vehicle controls still operate when you choose them. An already running request may finish when the screen turns off.

@@ -35,7 +35,7 @@ The domain still describes Tesla-specific concepts, such as keeper modes and rep
 
 | Component | Responsibility |
 | --- | --- |
-| `tesla-battery.1m.sh` | Small shell entry point in xBar's plugin directory. Its filename supplies the refresh interval. |
+| `tesla-battery.5m.sh` | Small shell entry point in xBar's plugin directory. Its filename supplies the refresh interval. |
 | `tesla-action.sh` | Generated shell launcher that uses the Python interpreter selected during installation. Menu actions also call this launcher. |
 | [`tesla_xbar.py`](../src/tesla_xbar.py) | Small Python entrypoint that calls the composition root. |
 | [`tesla_bar/`](../src/tesla_bar/README.md) | Four layers: domain rules, application services/ports, presentation and infrastructure adapters. Uses only the standard library. Installed together as `tesla-runtime.zip` so an update replaces the whole module bundle atomically. |
@@ -43,6 +43,7 @@ The domain still describes Tesla-specific concepts, such as keeper modes and rep
 | `tesla-keychain`, built from [`keychain.swift`](../src/keychain.swift) | Small Swift executable that accesses macOS Keychain. Secrets are passed to it through stdin. |
 | `tesla-location`, built from [`location.swift`](../src/location.swift) | Short-lived Swift helper using Apple’s reverse-geocoding service. Receives only vehicle coordinates over stdin and returns a postal address. It never requests the Mac’s location. |
 | `tesla-map-image`, built from [`map_image.swift`](../src/map_image.swift) | Local AppKit renderer. Receives map image bytes over stdin, adds a blue dot with a white outline and emits a Retina PNG. No network, GPS or Keychain access. |
+| `tesla-visibility`, built from [`visibility.swift`](../src/visibility.swift) | One-shot AppKit/CoreGraphics desktop probe. Reads session, display power, on-screen window geometry and menu-bar visibility; returns only booleans. No screenshots, Accessibility, screen-recording permission, network or resident observer. |
 | `tesla-control`, built by [`build_commands.py`](../scripts/build_commands.py) | Tesla's Go command tool, built from a pinned revision with a small [climate-keeper CLI adapter](../src/commands/README.md). Python invokes it for commands requiring vehicle signatures. The SDK checkout remains unchanged. |
 | [`install.py`](../scripts/install.py) | Builds the helpers, installs the runtime and launchers, and creates a signing key for a new profile. Updates reuse the existing private profile. |
 
@@ -65,7 +66,7 @@ A new backend can implement the same port without changing command preconditions
 
 1. xBar runs its generated shell wrapper; the Python entrypoint calls `bootstrap.main()`.
 2. The CLI parses a `Request`; `PluginService` loads configuration through the `Profile` port.
-3. A normal refresh gets vehicle availability and, when online, one combined reading. An unavailable car retains its last reading. Normal refresh never calls `execute`.
+3. A normal refresh first checks the injected `Desktop` port. If the desktop is hidden or visibility cannot be verified, it returns saved readings without constructing the Tesla gateway, renewing tokens or running location/map lookups. Otherwise it gets vehicle availability and, when online, one combined reading. An unavailable car retains its last reading. Normal refresh never calls `execute`.
 4. An explicit command acquires the profile lock without queueing, validates the clicked VIN and permissions, wakes if needed, validates current conditions, executes and reads back the result. An acknowledgement alone is not treated as a confirmed lock/trunk/climate transition.
 5. The service returns a `Result`, containing data rather than menu text. Bootstrap supplies a single timestamp, launcher path, optional image bytes and action notices in `MenuContext`.
 6. `MenuRenderer` returns xBar text deterministically from those inputs. The display adapter publishes it atomically. Network connections close at the end of the invocation.
@@ -97,3 +98,11 @@ The existing private profile, Keychain accounts, wrapper interval, icons and com
 [`test_layers.py`](../tests/test_layers.py) checks imports in every runtime file, including imports inside functions. It rejects forbidden layer dependencies, cycles and external-effect dependencies in the core. It also runs refresh, wake/unlock, climate shutdown, retry and account use cases with in-memory ports, and renders a menu while filesystem/network/process/clock calls are forbidden.
 
 Existing behavior and adapter integration tests still cover raw Tesla responses, command payloads, OAuth/settings callbacks, HTTPS reuse, maps, icons and installation. The installer test executes the nested zip bundle from an isolated profile. No test sends a real vehicle command.
+
+## Desktop visibility and scheduling
+
+New installations use `tesla-battery.5m.sh`; updates preserve the existing filename. xBar remains the only scheduler. Every `menu`/`refresh` invocation checks `DesktopVisibility` before any Tesla or map work. The native probe has a three-second timeout; missing, malformed or failed probe results pause polling rather than silently sending requests.
+
+The probe checks that this user owns the console, the session is unlocked, at least one active display is awake, no display is covered by a screen-saver-level window, and AppKit reports the menu bar visible. An awake external display permits operation with the built-in display asleep. Window metadata is read without window titles or pixels. This is a desktop visibility check, not proof that this particular xBar item is unobscured by the notch or a menu-bar organizer. The private `CGSSessionScreenIsLocked` dictionary entry is isolated in this adapter; the other signals use public AppKit/CoreGraphics APIs.
+
+Paused output keeps the saved range/percentage, cable color and original reading times, labels statuses as last known and suppresses live icons/pulsing. The pause reason exists only in the current result, never as a fabricated vehicle state or new cache timestamp. The next visible invocation resumes immediately; there is no wake observer or extra polling loop. A request already in flight when the screen goes dark may finish. Explicit account actions and physical commands remain user initiated and are not cancelled if visibility changes after a click.
