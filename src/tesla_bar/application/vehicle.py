@@ -4,6 +4,7 @@ from .ports import Profile, Clock, VehicleGateway, Record
 from .location import LocationService
 from ..domain.commands import VehicleCommand
 from ..domain.errors import RemoteError, AppError, Failure
+from ..domain.models import consecutive_read_errors
 
 class VehicleService:
     def __init__(self, profile: Profile, clock: Clock, gateway_factory: Callable[[dict], VehicleGateway], location: LocationService):
@@ -24,12 +25,14 @@ class VehicleService:
             self.location.update_location_map(cache, config)
             self.profile.write(Record.STATE, cache)
             return cache
-        gateway = gateway or self.gateway_factory(config)
         cache.pop("retry_at", None)
         cache.pop("retry_reason", None)
         cache["vehicle_verified"] = False
+        reading_in_progress = True
         try:
+            gateway = gateway or self.gateway_factory(config)
             vehicles = gateway.vehicles()
+            reading_in_progress = False
             cache["vehicles"] = [{"vin": v["vin"], "name": v.get("name") or "Tesla"} for v in vehicles]
             vin = config.get("vin") or cache.get("vin") or cache.get("selected_vin")
             selected = next((v for v in vehicles if v["vin"] == vin), None) if vin else (vehicles[0] if len(vehicles) == 1 else None)
@@ -56,6 +59,7 @@ class VehicleService:
                 # obsolete permission/lookup error until its next live GPS reading.
                 cache.pop("location_error", None)
             if cache["state"] == "online":
+                reading_in_progress = True
                 try:
                     reading = gateway.reading(selected["vin"], location_allowed, now)
                 except RemoteError as exc:
@@ -65,10 +69,15 @@ class VehicleService:
                     cache.pop("location", None)
                     cache["location_error"] = "Tesla denied location access. Connect your Tesla account again."
                     reading = gateway.reading(selected["vin"], False, now)
+                reading_in_progress = False
                 position = reading.pop("position", None)
                 cache.update(reading)
+                cache["consecutive_read_errors"] = 0
                 if location_allowed:
                     self.location.update_location(cache, position, now)
+            else:
+                # A successful availability check is not a failed live-data read.
+                cache["consecutive_read_errors"] = 0
         except AppError as exc:
             cache["error"] = str(exc)
             cache["retry_reason"] = exc.reason if isinstance(exc, RemoteError) else None
@@ -76,6 +85,10 @@ class VehicleService:
                 cache["retry_at"] = self.clock.now() + exc.retry_after
             if isinstance(exc, RemoteError) and exc.reason == Failure.UNAVAILABLE:
                 cache["state"] = "offline"  # Unavailable is not proof of sleep.
+                cache["consecutive_read_errors"] = 0
+            elif reading_in_progress:
+                # Count failed refresh attempts, not each HTTP request/retry.
+                cache["consecutive_read_errors"] = consecutive_read_errors(cache) + 1
         self.location.update_location_map(cache, config)
         self.profile.write(Record.STATE, cache)
         return cache

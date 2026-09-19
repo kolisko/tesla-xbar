@@ -3,9 +3,10 @@ import math
 
 
 STALE_AFTER_SECONDS = 30 * 60
+READ_ERROR_THRESHOLD = 3
 
 
-STATUS_ICON_ORDER = ("charging", "camp", "pet", "fan", "unlocked", "sentry", "frunk", "trunk")
+STATUS_ICON_ORDER = ("charging", "camp", "pet", "fan", "unlocked", "sentry", "frunk", "trunk", "api-error")
 
 
 COMMAND_LABELS = {'charge-start': 'Start charging',
@@ -39,6 +40,15 @@ CLIMATE_MODES = {"climate-keep": "on", "climate-pet": "dog",
 
 def number(value):
     return isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value)
+
+
+def consecutive_read_errors(cache):
+    value = cache.get("consecutive_read_errors", 0)
+    return value if isinstance(value, int) and not isinstance(value, bool) and value > 0 else 0
+
+
+def read_error_alert(cache):
+    return consecutive_read_errors(cache) >= READ_ERROR_THRESHOLD
 
 
 def temperature_limits(cache):
@@ -89,6 +99,8 @@ def cable_connected(charge):
 
 
 def battery_color(cache):
+    if read_error_alert(cache):
+        return None
     connected = cable_connected(cache.get("charge") or {})
     if connected is True:
         return "#32CD66"
@@ -105,14 +117,14 @@ def battery_color(cache):
 def charging_is_current(cache, *, now):
     fresh_until = cache.get("updated_at", 0) + STALE_AFTER_SECONDS
     return (cache.get("charge", {}).get("charging_state") == "Charging"
-            and cache.get("state") == "online" and not cache.get("error") and not cache.get("polling_paused")
+            and cache.get("state") == "online" and not cache.get("error") and not read_error_alert(cache) and not cache.get("polling_paused")
             and now < fresh_until)
 
 
 def status_is_current(cache, section, *, now):
     data = cache.get(section) or {}
     timestamp = data.get("updated_at")
-    return (cache.get("state") == "online" and not cache.get("error") and not cache.get("polling_paused")
+    return (cache.get("state") == "online" and not cache.get("error") and not read_error_alert(cache) and not cache.get("polling_paused")
             and number(timestamp) and 0 <= now - timestamp < STALE_AFTER_SECONDS)
 
 
@@ -122,6 +134,8 @@ def climate_mode(cache):
 
 
 def active_status_icons(cache, *, now):
+    if read_error_alert(cache):
+        return ["api-error"]
     icons = ["charging"] if charging_is_current(cache, now=now) else []
     if status_is_current(cache, "climate", now=now):
         mode = climate_mode(cache)

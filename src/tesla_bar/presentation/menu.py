@@ -8,6 +8,7 @@ from ..application.ports import MenuContext
 from ..domain.settings import SETTINGS
 from ..domain.models import CLIMATE_MODES, LOCK_TRUNK_COMMANDS, STALE_AFTER_SECONDS, COMMAND_LABELS, battery_color, cable_connected, charging_is_current, climate_mode, number, status_is_current, temperature_limits, trunk_open_state, vehicle_range
 from ..domain.location import coordinates
+from ..domain.models import consecutive_read_errors, read_error_alert
 
 def safe_text(value):
     value = str(value).replace("|", "¦")
@@ -165,14 +166,18 @@ class MenuRenderer:
         now = self.context.now
         stale = now - cache.get("updated_at", 0) >= STALE_AFTER_SECONDS
         offline = cache.get("state") != "online"
-        unverified = offline or stale or bool(cache.get("error")) or bool(cache.get("polling_paused"))
+        read_failed = read_error_alert(cache)
+        unverified = offline or stale or read_failed or bool(cache.get("error")) or bool(cache.get("polling_paused"))
         charging = charging_is_current(cache, now=self.context.now)
         connected = cable_connected(charge)
         color = battery_color(cache)
         distance = vehicle_range(cache)
         value = (f"{level:g}%" if level is not None else None) if config.get("display_mode") == "percent" else distance
+        if read_failed:
+            unit = {"km/hr": "km", "mi/hr": "mi"}.get((cache.get("gui_settings") or {}).get("gui_distance_units"))
+            value = "—%" if config.get("display_mode") == "percent" else (f"— {unit}" if unit else "—")
         top = f"{'DEMO ' if demo else ''}{value if value is not None else '—'}"
-        if cache.get("state") in ("offline", "asleep"):
+        if not read_failed and cache.get("state") in ("offline", "asleep"):
             top += " ·"
         params = [f"color={color}"] if color else []
         icon_image = base64.b64encode(self.context.icon_image).decode("ascii") if self.context.icon_image else ""
@@ -180,6 +185,9 @@ class MenuRenderer:
             params.append(f"templateImage={icon_image}")
         lines = [top + (" | " + " ".join(params) if params else ""), "---",
                  safe_text(cache.get("name", "Tesla xBar")) + " | size=15"]
+        if read_failed:
+            lines.append(f"Vehicle data refresh failed {consecutive_read_errors(cache)} times in a row. | color=#D9534F")
+            lines.append("Last known readings below; current values unavailable. | color=gray")
         if level is not None:
             lines.append(f"Battery: {level:g} %")
             if distance is not None:
@@ -222,7 +230,7 @@ class MenuRenderer:
             lines.extend(["---", safe_text(cache["error"]) + " | color=#D9534F"])
         if cache.get("wake_in_progress"):
             lines.append("Waking the vehicle and waiting for it to connect… | color=gray")
-        if unverified and value is not None and connected is True:
+        if unverified and not read_failed and value is not None and connected is True:
             lines.append("Green text reflects the last known cable connection. | color=gray")
         report = self.context.report
         if report and report.get("vin") in (None, cache.get("vin")):
@@ -266,6 +274,7 @@ class MenuRenderer:
                 label = ("✓ " if vehicle["vin"] == cache.get("vin") else "") + safe_text(vehicle["name"])
                 lines.append("--" + self.action(label, "select", vehicle["vin"]))
         lines.extend(["---", "Debug info"])
+        lines.append(f"--Consecutive failed refreshes: {consecutive_read_errors(cache)} | color=gray")
         for event, label in (("plugin_runs", "Plugin run"), ("tesla_api_calls", "Tesla API request")):
             times = self.context.diagnostics.get(event, [])
             for i, order in enumerate(("Latest", "Previous")):
