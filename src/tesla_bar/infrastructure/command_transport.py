@@ -60,6 +60,7 @@ def send_vehicle_command(client, vin, command, capabilities, temperature=None):
     # Tokens go through a pipe, never argv, environment or a temporary file.
     env = {k: v for k, v in os.environ.items() if not k.startswith("TESLA_")}
     env["TESLA_VERBOSE"] = "false"
+    env["TESLA_XBAR_DIAGNOSTICS_DIR"] = str(runtime.APP_DIR)
     try:
         result = subprocess.run(args, input=token, capture_output=True, text=True,
                                 timeout=45, env=env, umask=0o077)

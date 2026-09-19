@@ -49,6 +49,7 @@ Open **Sentry** for on/off controls and **Location** for the address, optional m
 - **Last known data:** asleep and offline readings keep the saved range or percentage and add a small trailing dot, such as `360 km ·` or `73% ·`. Connection state does not change the text color: a last known connected cable stays green, and unplugged readings keep the normal range colors. Failed or stale readings retain their values and colors too; the dot specifically indicates offline/asleep. The connection state and original reading timestamp stay visible in the menu.
 - **One refresh schedule:** new installs default to five minutes (`5m`); xBar's filename controls polling. **Refresh now** uses the same path. No second polling timer or invented monthly quota.
 - **Pause when hidden:** automatic refresh uses saved data when displays are asleep, the session is locked/inactive, a screen saver covers a display, or macOS reports the menu bar hidden. No Tesla, token-renewal, address or map request is made by that refresh. Polling resumes on the next visible xBar run.
+- **Debug info:** the latest two plugin runs and latest two dispatched Tesla API requests, with local millisecond timestamps. Paused runs advance only the plugin times; error responses still count as API requests.
 - **Explicit commands:** wake and refresh, start/stop charging, open/close the charge port, climate and Sentry controls, lock/unlock, and front/rear trunk controls. Normal refresh only reads vehicle state and never sends a physical command.
 - **Clima submenu:** normal climate, Keep Climate On, Camp Mode, Pet Mode, temperature selection in 0.5 °C steps, modes off, and full climate/modes off. Temperature choices use the limits reported by the vehicle and set both front zones; changing the target alone does not turn climate on. Normal climate and full shutdown exit an active keeper mode first. Clicked actions can wake an unavailable vehicle before sending the command.
 - **Sentry submenu:** turn Sentry on or off using the existing Vehicle Commands permission. The active icon uses the same size, monochrome tint and placement as the other indicators.
@@ -115,6 +116,7 @@ The shared [`settings schema`](src/tesla_bar/domain/settings.py) defines default
 | Stored item | Contents and handling |
 | --- | --- |
 | `config.json` | Settings and app-registration state. It contains account-specific details such as Client ID, domain and selected VIN; keep it private even though it does not hold tokens or the Client Secret. |
+| `diagnostics.json` in the private profile | Only the two most recent plugin-run times and two most recent dispatched Tesla-request times. No URLs, tokens, VINs or response payloads. |
 | macOS Keychain, service `cz.tesla-xbar` | Client Secret and OAuth access/refresh tokens. These are separate from the profile's JSON files. |
 | `command-key.pem` | Private P-256 signing key, generated locally for a new profile. Keep it private and back it up securely. |
 | `public-key.pem` | Matching public key. **Only this key** is copied to your public HTTPS domain's well-known Tesla path. |

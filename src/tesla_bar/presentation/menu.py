@@ -265,7 +265,20 @@ class MenuRenderer:
             for vehicle in cache["vehicles"]:
                 label = ("✓ " if vehicle["vin"] == cache.get("vin") else "") + safe_text(vehicle["name"])
                 lines.append("--" + self.action(label, "select", vehicle["vin"]))
-        lines.extend(["---", "Refresh interval managed by xBar | color=gray",
+        lines.extend(["---", "Debug info"])
+        for event, label in (("plugin_runs", "Plugin run"), ("tesla_api_calls", "Tesla API request")):
+            times = self.context.diagnostics.get(event, [])
+            for i, order in enumerate(("Latest", "Previous")):
+                stamp = "Not recorded yet"
+                if i < len(times):
+                    try:
+                        stamp = dt.datetime.fromtimestamp(times[i]).astimezone().strftime("%d %b %H:%M:%S.%f")[:-3]
+                    except (TypeError, ValueError, OSError, OverflowError):
+                        pass
+                lines.append(f"--{label} — {order}: {stamp} | color=gray")
+        lines.extend(["--Times are local; API requests include error responses. | color=gray",
+                      "--Saved readings and skipped refreshes do not count as API requests. | color=gray",
+                      "---", "Refresh interval managed by xBar | color=gray",
                       "Tesla Developer | href=https://developer.tesla.com",
                       "Manage Tesla permissions | href=https://www.tesla.com/teslaaccount/settings/security"])
         return "\n".join(lines)

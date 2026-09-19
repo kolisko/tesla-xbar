@@ -7,7 +7,7 @@ from .application.settings import SettingsService
 from .application.accounts import AccountService
 from .application.plugin import PluginService
 from .domain.models import active_status_icons, charging_is_current, STALE_AFTER_SECONDS
-from .infrastructure import auth, runtime, settings_input, display
+from .infrastructure import auth, runtime, settings_input, display, diagnostics
 from .infrastructure.profile import FileProfile, SystemClock, KeychainVault, SetupSession
 from .infrastructure.gateway import TeslaGateway
 from .infrastructure.maps import MapMapMedia, AppleGeocoder
@@ -15,7 +15,7 @@ from .infrastructure.transport import session_scope
 from .infrastructure.visibility import DesktopVisibility
 from .presentation.menu import MenuRenderer
 from .presentation.settings_form import settings_fields_html
-from .presentation.cli import run
+from .presentation.cli import run, parse_request
 
 
 class InteractiveSettings:
@@ -34,7 +34,8 @@ def menu_context(profile, clock, maps, cache):
     now = clock.now()
     return MenuContext(now, str(runtime.APP_DIR / "tesla-action.sh"),
         display.status_icon_bytes(active_status_icons(cache, now=now)), maps.saved(cache),
-        profile.read(Record.COMMAND_RESULT), profile.read(Record.ACTION_NOTICE), profile.read(Record.COMMAND_SETUP))
+        profile.read(Record.COMMAND_RESULT), profile.read(Record.ACTION_NOTICE), profile.read(Record.COMMAND_SETUP),
+        diagnostics.snapshot())
 
 
 def present(result, profile, clock, maps):
@@ -58,6 +59,9 @@ def build():
 
 
 def main(argv=None):
+    request = parse_request(argv)
+    if request.command in ("menu", "refresh"):
+        diagnostics.record("plugin_runs")
     with session_scope():
         service, presenter = build()
-        return run(service, presenter, argv)
+        return run(service, presenter, request=request)

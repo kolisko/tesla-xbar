@@ -103,6 +103,7 @@ class MenuContext:
     report: dict = field(default_factory=dict)
     notice: dict = field(default_factory=dict)
     setup: dict = field(default_factory=dict)
+    diagnostics: dict = field(default_factory=dict)
 
 
 class IdentityProvider(Protocol):

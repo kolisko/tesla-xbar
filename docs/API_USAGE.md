@@ -1,6 +1,6 @@
 # API usage review
 
-Review date: 2026-09-19. This is a source-level request audit, not a historical billing report or a capture of a user's vehicle responses. Apart from desktop visibility gating and the five-minute default, the optimizations proposed below have **not** been implemented.
+Review date: 2026-09-19. This is a source-level request audit, not a historical billing report or a capture of a user's vehicle responses. Apart from desktop visibility gating, the five-minute default and the two-event debug timestamps, the optimizations proposed below have **not** been implemented.
 
 ## Requests in one invocation
 
@@ -28,7 +28,7 @@ At an uninterrupted one-minute schedule with the vehicle always online, ordinary
 
 The live request explicitly selects `charge_state`, `gui_settings`, `climate_state` and `vehicle_state`; `location_data` is added only when enabled and authorized. They are sections of **one HTTP response**, not five separate requests. They support the existing battery, charging, units, climate, temperature, locks, trunks, Sentry and location features. Unrequested sections are not deliberately requested. The plugin keeps only the fields it uses, but filtering after receipt does not reduce the bytes already downloaded.
 
-There is no historical request counter or raw response-size log, so exact past byte totals cannot be reconstructed from the smaller filtered cache. The JSON transport does not explicitly request gzip, and it reuses HTTPS connections only within the same invocation. A map is a separate 720 × 480 PNG, with a 3 MB acceptance cap (not its measured typical size), and is embedded locally in xBar output afterwards. Reopening the submenu does not download the image again. Address lookup uses Apple's service; map retrieval uses MapMap. Neither is a Tesla API request.
+Debug info retains only the latest two request times. There is no historical request counter or raw response-size log, so exact past byte totals cannot be reconstructed from the smaller filtered cache. The JSON transport does not explicitly request gzip, and it reuses HTTPS connections only within the same invocation. A map is a separate 720 × 480 PNG, with a 3 MB acceptance cap (not its measured typical size), and is embedded locally in xBar output afterwards. Reopening the submenu does not download the image again. Address lookup uses Apple's service; map retrieval uses MapMap. Neither is a Tesla API request.
 
 ## Proposed optimizations — not applied
 

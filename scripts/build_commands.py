@@ -29,7 +29,7 @@ def build_commands():
                     for source in adapter.glob("*.go")}
     overlay.write_text(json.dumps({"Replace": replacements}))
     subprocess.run(["go", "test", "-C", str(checkout), "-overlay", str(overlay),
-                    "-run", "TestXBarClimateKeeperMode", "./cmd/tesla-control"], env=env, check=True)
+                    "-run", "TestXBar", "./cmd/tesla-control"], env=env, check=True)
     binary = build / "tesla-control"
     subprocess.run(["go", "build", "-C", str(checkout), "-overlay", str(overlay),
                     "-trimpath", "-o", str(binary), "./cmd/tesla-control"], env=env, check=True)

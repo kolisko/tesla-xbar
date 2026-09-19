@@ -14,8 +14,8 @@ def parse_request(argv=None):
     return Request(**vars(parser.parse_args(argv)))
 
 
-def run(service, present, argv=None):
-    result = service.handle(parse_request(argv))
+def run(service, present, argv=None, *, request=None):
+    result = service.handle(request if request is not None else parse_request(argv))
     for message in result.messages:
         print(message)
     if result.cache is not None:

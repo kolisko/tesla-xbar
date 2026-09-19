@@ -214,7 +214,7 @@ class Tests(unittest.TestCase):
             client.get("/api/1/vehicles")
         http.assert_called_once()
         self.assertNotIn("4000", app.render({}, self.config))
-        self.assertNotIn("requests", app.render({}, self.config))
+        self.assertNotIn("monthly", app.render({}, self.config).lower())
         self.assertNotIn("billing", app.render({}, self.config))
 
     def test_runtime_files_private(self):

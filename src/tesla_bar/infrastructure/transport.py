@@ -12,6 +12,7 @@ from contextlib import contextmanager
 
 from ..domain.errors import AppError
 from .errors import APIError
+from .diagnostics import request_sent
 
 
 class NoRedirect(urllib.request.HTTPRedirectHandler):
@@ -66,6 +67,7 @@ class HTTPSession:
             if urllib.request.getproxies().get("https") and not urllib.request.proxy_bypass(parsed.hostname):
                 with urllib.request.build_opener(NoRedirect).open(
                         urllib.request.Request(url, data=data, headers=headers), timeout=18) as response:
+                    request_sent(parsed.hostname)
                     raw = response.read()
             else:
                 connection = self.connections.get(origin)
@@ -74,6 +76,7 @@ class HTTPSession:
                     self.connections[origin] = connection
                 path = urllib.parse.urlunsplit(("", "", parsed.path or "/", parsed.query, ""))
                 connection.request("POST" if data is not None else "GET", path, body=data, headers=headers)
+                request_sent(parsed.hostname)
                 response = connection.getresponse()
                 raw = response.read()  # Consume the body before reusing the connection.
                 if response.status >= 300:
@@ -83,6 +86,7 @@ class HTTPSession:
                 raise AppError("Tesla returned an unexpected response.")
             return result
         except urllib.error.HTTPError as exc:
+            request_sent(parsed.hostname)  # Proxy/urllib sent a request and received an error response.
             raise APIError(exc.code, retry_after_seconds(exc.headers.get("Retry-After", ""))) from None
         except (OSError, http.client.HTTPException, urllib.error.URLError):
             connection = self.connections.pop(origin, None)

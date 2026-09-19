@@ -165,3 +165,9 @@ The map preview uses `location_map_enabled` (default `false`) and the `tesla-map
 New installations refresh every five minutes. Change the interval through xBar's plugin management; the installer preserves existing intervals. `Refresh now` follows the same visibility check. Automatic requests pause while displays are asleep, your session is locked/inactive, a screen saver covers a display, or macOS reports the menu bar hidden. Saved readings and their original timestamps remain available. Updates resume at the next xBar run after the desktop is visible again (up to the configured interval), or when you choose **Refresh now**.
 
 If the menu reports **desktop visibility unavailable**, update the installation so `tesla-visibility` is present. The helper needs no Screen Recording or Accessibility permission. A failed probe pauses routine requests; explicit vehicle controls still operate when you choose them. An already running request may finish when the screen turns off.
+
+## Debug info
+
+**Debug info** shows the latest and previous plugin invocation and the latest and previous dispatched Tesla API request. Times include the date and milliseconds in your Mac's local timezone. During a skipped refresh the plugin times change, while the API times stay unchanged. Two consecutive API times can be close together because an online refresh first checks availability and then fetches live data. HTTP errors still count; these times do not mean the requests succeeded. OAuth and signed-command requests are included, but map/address requests are not.
+
+History starts when this update is installed; missing values say **Not recorded yet**. Only those four times are retained in `diagnostics.json`, outside the checkout. Updating the signed-command diagnostics requires rebuilding `tesla-control` (`python3 -m scripts.install`); a runtime-only update does not replace an already installed command helper.
