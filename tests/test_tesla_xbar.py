@@ -8,6 +8,7 @@ from unittest.mock import patch
 
 from tests import harness as app
 from src.tesla_bar.infrastructure import api, runtime, transport
+from src.tesla_bar.application.ports import Visibility
 
 
 class Vault:
@@ -114,7 +115,8 @@ class Tests(unittest.TestCase):
         app.save_json("cache.json", first | {"next_poll": time.time() + 1200})
         client.level = 71
         for command in ("menu", "refresh"):
-            with patch.object(api, "Client", return_value=client), patch("sys.argv", ["tesla_xbar.py", command]), patch("sys.stdout", new_callable=io.StringIO):
+            with patch.object(api, "Client", return_value=client), patch("sys.argv", ["tesla_xbar.py", command]), patch("sys.stdout", new_callable=io.StringIO), \
+                 patch("src.tesla_bar.bootstrap.DesktopVisibility.state", return_value=Visibility.VISIBLE):
                 self.assertEqual(app.main(), 0)
             fresh = app.read_json("cache.json")
             self.assertEqual(fresh["charge"]["battery_level"], client.level)
@@ -212,7 +214,7 @@ class Tests(unittest.TestCase):
             client.get("/api/1/vehicles")
         http.assert_called_once()
         self.assertNotIn("4000", app.render({}, self.config))
-        self.assertNotIn("requests", app.render({}, self.config))
+        self.assertNotIn("monthly", app.render({}, self.config).lower())
         self.assertNotIn("billing", app.render({}, self.config))
 
     def test_runtime_files_private(self):

@@ -11,7 +11,7 @@ from src.tesla_bar.application.accounts import AccountService
 from src.tesla_bar.application.commands import CommandService
 from src.tesla_bar.application.location import LocationService
 from src.tesla_bar.application.plugin import PluginService
-from src.tesla_bar.application.ports import MenuContext, Record, Request
+from src.tesla_bar.application.ports import MenuContext, Record, Request, Visibility
 from src.tesla_bar.application.vehicle import VehicleService
 from src.tesla_bar.domain.commands import VehicleCommand
 from src.tesla_bar.domain.errors import AppError, Failure, RemoteError
@@ -176,7 +176,9 @@ class IsolatedServiceTests(unittest.TestCase):
         self.location = LocationService(self.clock, self.maps, self.geocoder)
         self.vehicles = VehicleService(self.profile, self.clock, lambda config: self.gateway, self.location)
         self.commands = CommandService(self.profile, self.clock, self.vehicles, lambda config: self.gateway)
-        self.app = PluginService(self.profile, self.clock, self.accounts, self.vehicles, self.commands, self.location)
+        self.desktop = Mock()
+        self.desktop.state.return_value = Visibility.VISIBLE
+        self.app = PluginService(self.profile, self.clock, self.accounts, self.vehicles, self.commands, self.location, self.desktop)
 
     def test_refresh_and_renderer_work_with_all_external_io_forbidden(self):
         with ExitStack() as stack:

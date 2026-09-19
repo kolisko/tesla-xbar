@@ -53,6 +53,7 @@ jobs:
           swiftc src/keychain.swift -o build/tesla-keychain
           swiftc src/location.swift -o build/tesla-location
           swiftc src/map_image.swift -o build/tesla-map-image
+          swiftc src/visibility.swift -o build/tesla-visibility
       - name: Show Swift extraction diagnostics on failure
         if: failure() && matrix.language == 'swift'
         run: |

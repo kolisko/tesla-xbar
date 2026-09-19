@@ -105,14 +105,14 @@ def battery_color(cache):
 def charging_is_current(cache, *, now):
     fresh_until = cache.get("updated_at", 0) + STALE_AFTER_SECONDS
     return (cache.get("charge", {}).get("charging_state") == "Charging"
-            and cache.get("state") == "online" and not cache.get("error")
+            and cache.get("state") == "online" and not cache.get("error") and not cache.get("polling_paused")
             and now < fresh_until)
 
 
 def status_is_current(cache, section, *, now):
     data = cache.get(section) or {}
     timestamp = data.get("updated_at")
-    return (cache.get("state") == "online" and not cache.get("error")
+    return (cache.get("state") == "online" and not cache.get("error") and not cache.get("polling_paused")
             and number(timestamp) and 0 <= now - timestamp < STALE_AFTER_SECONDS)
 
 

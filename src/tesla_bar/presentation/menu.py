@@ -165,7 +165,7 @@ class MenuRenderer:
         now = self.context.now
         stale = now - cache.get("updated_at", 0) >= STALE_AFTER_SECONDS
         offline = cache.get("state") != "online"
-        unverified = offline or stale or bool(cache.get("error"))
+        unverified = offline or stale or bool(cache.get("error")) or bool(cache.get("polling_paused"))
         charging = charging_is_current(cache, now=self.context.now)
         connected = cable_connected(charge)
         color = battery_color(cache)
@@ -207,6 +207,11 @@ class MenuRenderer:
         else:
             lines.append("Battery data is not available yet.")
         lines.extend(self.status_menu_lines(cache))
+        if cache.get("polling_paused"):
+            reason = {"display_off": "display off", "locked": "screen locked", "screensaver": "screen saver active",
+                      "inactive": "user session inactive", "bar_hidden": "menu bar hidden",
+                      "unknown": "desktop visibility unavailable"}.get(cache["polling_paused"], "desktop unavailable")
+            lines.append(f"Automatic refresh paused: {reason} • last known data | color=gray")
         if cache.get("state") == "asleep":
             lines.append("Vehicle asleep • last known data | color=gray")
         elif cache.get("state") == "offline":
@@ -260,7 +265,20 @@ class MenuRenderer:
             for vehicle in cache["vehicles"]:
                 label = ("✓ " if vehicle["vin"] == cache.get("vin") else "") + safe_text(vehicle["name"])
                 lines.append("--" + self.action(label, "select", vehicle["vin"]))
-        lines.extend(["---", "Refresh interval managed by xBar | color=gray",
+        lines.extend(["---", "Debug info"])
+        for event, label in (("plugin_runs", "Plugin run"), ("tesla_api_calls", "Tesla API request")):
+            times = self.context.diagnostics.get(event, [])
+            for i, order in enumerate(("Latest", "Previous")):
+                stamp = "Not recorded yet"
+                if i < len(times):
+                    try:
+                        stamp = dt.datetime.fromtimestamp(times[i]).astimezone().strftime("%d %b %H:%M:%S.%f")[:-3]
+                    except (TypeError, ValueError, OSError, OverflowError):
+                        pass
+                lines.append(f"--{label} — {order}: {stamp} | color=gray")
+        lines.extend(["--Times are local; API requests include error responses. | color=gray",
+                      "--Saved readings and skipped refreshes do not count as API requests. | color=gray",
+                      "---", "Refresh interval managed by xBar | color=gray",
                       "Tesla Developer | href=https://developer.tesla.com",
                       "Manage Tesla permissions | href=https://www.tesla.com/teslaaccount/settings/security"])
         return "\n".join(lines)

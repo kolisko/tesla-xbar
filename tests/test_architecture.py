@@ -197,7 +197,7 @@ class SessionTests(unittest.TestCase):
     def test_cli_closes_session_even_when_action_fails(self):
         with patch.object(transport, "_session", self.session), patch.object(cli, "run", side_effect=RuntimeError("test")):
             with self.assertRaises(RuntimeError):
-                cli.main()
+                cli.main(["demo"])
             self.assertIsNone(transport._session)
 
     def test_real_local_requests_reuse_one_tcp_connection(self):

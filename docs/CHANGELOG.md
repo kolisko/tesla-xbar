@@ -4,6 +4,11 @@ Release tags use `vMAJOR.MINOR.PATCH`; the installed xBar plugin metadata uses t
 
 ## Unreleased
 
+- Add Debug info with the latest two plugin-run and dispatched Tesla-request times, including failed responses, OAuth and signed-command SDK requests. Keep only four private timestamps.
+
+- Pause routine network refresh when the desktop/menu bar is hidden, locked, asleep or covered by a screen saver; retain saved readings and resume on the next visible xBar invocation.
+- Default new installations to a five-minute xBar interval; preserve existing user-selected filenames on update.
+
 - Separate domain rules, application services, presentation and infrastructure with explicit dependency ports and one composition root.
 - Route all physical actions, including wake, through one semantic vehicle gateway; keep REST/CLI translation and signing inside the Tesla adapter.
 - Make menu rendering independent of files, network and implicit time; isolate account/configuration updates from interactive input.

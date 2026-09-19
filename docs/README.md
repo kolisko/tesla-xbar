@@ -3,6 +3,7 @@
 | Path | Contents |
 | --- | --- |
 | [`ARCHITECTURE.md`](ARCHITECTURE.md) | Architecture diagram, layer boundaries, runtime components, communication flow, configuration ownership and enforcement. |
+| [`API_USAGE.md`](API_USAGE.md) | Request-count and payload audit, volume estimates, billing distinction and unapplied optimization proposals. |
 | [`SETUP.md`](SETUP.md) | Installation, public-key hosting, Tesla Developer registration, account consent, vehicle pairing and troubleshooting. |
 | [`CHANGELOG.md`](CHANGELOG.md) | Release history, feature changes and upgrade instructions. |
 | [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md) | Licensing and attribution for separately built or installed software. |

@@ -4,6 +4,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 
 from scripts import install
 
@@ -22,7 +23,7 @@ class InstallTests(unittest.TestCase):
         (self.source / "src" / "tesla_bar" / "__init__.py").write_text("# package\n")
         (self.source / "src" / "icons").mkdir()
         (self.source / "src" / "icons" / "fan.png").write_bytes(b"example icon")
-        for name in ("tesla-control", "tesla-keychain", "tesla-location", "tesla-map-image"):
+        for name in ("tesla-control", "tesla-keychain", "tesla-location", "tesla-map-image", "tesla-visibility"):
             (self.target / name).write_bytes(b"existing helper")
 
     def test_new_profile_gets_unique_key_outside_source(self):
@@ -69,6 +70,7 @@ class InstallTests(unittest.TestCase):
         source = Path(__file__).resolve().parents[1]
         wrapper = install.install(source, self.target, self.plugins,
                                   runtime_only=True, python=sys.executable)
+        self.assertEqual(wrapper.name, "tesla-battery.5m.sh")
         result = subprocess.run([str(wrapper)], cwd=self.source,
                                 env=os.environ | {"TESLA_XBAR_HOME": str(self.target)},
                                 capture_output=True, text=True, check=True, timeout=10)
@@ -91,6 +93,16 @@ class InstallTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "Multiple"):
             install.install(self.source, self.target, self.plugins, runtime_only=True)
         self.assertFalse((self.target / "command-key.pem").exists())
+
+    def test_runtime_upgrade_builds_only_missing_visibility_helper(self):
+        (self.target / "tesla-visibility").unlink()
+        compiled = self.root / "compiled-visibility"
+        compiled.write_bytes(b"native visibility helper")
+        with patch.object(install, "build_visibility", return_value=compiled) as build, \
+             patch.object(install, "build_helpers", side_effect=AssertionError("Unnecessary SDK rebuild")):
+            install.install(self.source, self.target, self.plugins, runtime_only=True)
+        build.assert_called_once_with(self.source)
+        self.assertEqual((self.target / "tesla-visibility").read_bytes(), compiled.read_bytes())
 
 
 if __name__ == "__main__":

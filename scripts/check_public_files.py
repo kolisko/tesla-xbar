@@ -8,6 +8,7 @@ import sys
 ROOT = Path(__file__).resolve().parents[1]
 PRIVATE_NAMES = {"config.json", "cache.json", "command-result.json", "command-setup.json",
                  "command-sessions.json", "authorization.json", "setup-session.json", "action-notice.json",
+                 "diagnostics.json", "diagnostics.lock",
                  "SETUP_STATUS.md", "ukazka-spiciho-auta.md", "display.c", "test_display.py", "location-map.png"}
 PRIVATE_DIRS = {".runtime", "build", "verification-site", ".openai", ".codex", ".agents", "node_modules"}
 PATTERNS = {
