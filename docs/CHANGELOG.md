@@ -4,6 +4,8 @@ Release tags use `vMAJOR.MINOR.PATCH`; the installed xBar plugin metadata uses t
 
 ## Unreleased
 
+- Show a matching circled-exclamation icon and neutral dash after three consecutive failed vehicle refreshes. Preserve the last known readings and timestamp in the menu; count failures in Debug info. Successful reads reset the warning, while normal vehicle sleep/offline and paused runs do not increment it.
+
 - Add Debug info with the latest two plugin-run and dispatched Tesla-request times, including failed responses, OAuth and signed-command SDK requests. Keep only four private timestamps.
 
 - Pause routine network refresh when the desktop/menu bar is hidden, locked, asleep or covered by a screen saver; retain saved readings and resume on the next visible xBar invocation.
