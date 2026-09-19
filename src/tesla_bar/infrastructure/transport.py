@@ -10,7 +10,7 @@ import urllib.parse
 import urllib.request
 from contextlib import contextmanager
 
-from ..domain.errors import AppError
+from ..domain.errors import AppError, RetryAdvice
 from .errors import APIError
 from .diagnostics import request_sent
 
@@ -20,14 +20,27 @@ class NoRedirect(urllib.request.HTTPRedirectHandler):
         return None  # Never forward bearer tokens or secrets across redirects.
 
 
-def retry_after_seconds(value):
+def parsed_retry_delay(value, *, now):
     try:
         return max(0, int(value))
     except (ValueError, TypeError):
         try:
-            return max(0, email.utils.parsedate_to_datetime(value).timestamp() - time.time())
+            return max(0, email.utils.parsedate_to_datetime(value).timestamp() - now)
         except (ValueError, TypeError, OverflowError):
-            return 0
+            return None
+
+
+def retry_after_seconds(value):
+    return parsed_retry_delay(value, now=time.time()) or 0
+
+
+def response_error(status, retry_header):
+    """Retain just the server's retry advice, never response bodies or other headers."""
+    advice = None
+    if isinstance(retry_header, str):
+        now = time.time()
+        advice = RetryAdvice(retry_header[:256], now, parsed_retry_delay(retry_header[:256], now=now))
+    return APIError(status, (advice.delay or 0) if advice else 0, retry_advice=advice)
 
 
 class HTTPSession:
@@ -80,14 +93,14 @@ class HTTPSession:
                 response = connection.getresponse()
                 raw = response.read()  # Consume the body before reusing the connection.
                 if response.status >= 300:
-                    raise APIError(response.status, retry_after_seconds(response.getheader("Retry-After", "")))
+                    raise response_error(response.status, response.getheader("Retry-After"))
             result = json.loads(raw)
             if not isinstance(result, dict):
                 raise AppError("Tesla returned an unexpected response.")
             return result
         except urllib.error.HTTPError as exc:
             request_sent(parsed.hostname)  # Proxy/urllib sent a request and received an error response.
-            raise APIError(exc.code, retry_after_seconds(exc.headers.get("Retry-After", ""))) from None
+            raise response_error(exc.code, exc.headers.get("Retry-After")) from None
         except (OSError, http.client.HTTPException, urllib.error.URLError):
             connection = self.connections.pop(origin, None)
             if connection is not None:

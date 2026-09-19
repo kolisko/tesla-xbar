@@ -13,7 +13,7 @@ def read_retry_delay(cache):
 
 def retry_not_before(cache, *, manual=False):
     """Honor the later of local error backoff and Tesla's rate-limit deadline."""
-    deadlines = [0]
+    deadlines = [tesla_retry_until(cache)]
     if not manual and read_error_alert(cache):
         value = cache.get("read_retry_at")
         if number(value) and value > 0:
@@ -23,6 +23,16 @@ def retry_not_before(cache, *, manual=False):
         if number(value) and value > 0:
             deadlines.append(value)
     return max(deadlines)
+
+
+def tesla_retry_until(cache):
+    advice = cache.get("tesla_retry_after") or {}
+    if not isinstance(advice, dict):
+        return 0
+    received, delay = advice.get("received_at"), advice.get("delay")
+    if number(received) and received > 0 and number(delay) and delay >= 0:
+        return received + delay
+    return 0
 
 
 def reuse_manual_refresh(cache, *, now):

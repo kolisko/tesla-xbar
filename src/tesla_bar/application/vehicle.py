@@ -1,11 +1,12 @@
 """Vehicle selection, refresh and explicit waking; no transport or filesystem."""
 from typing import Callable
+from dataclasses import asdict
 from .ports import Profile, Clock, VehicleGateway, Record
 from .location import LocationService
 from ..domain.commands import VehicleCommand
 from ..domain.errors import RemoteError, AppError, Failure
 from ..domain.models import consecutive_read_errors
-from ..domain.polling import read_retry_delay, retry_not_before
+from ..domain.polling import read_retry_delay, retry_not_before, tesla_retry_until
 
 class VehicleService:
     def __init__(self, profile: Profile, clock: Clock, gateway_factory: Callable[[dict], VehicleGateway], location: LocationService):
@@ -65,7 +66,9 @@ class VehicleService:
                 try:
                     reading = gateway.reading(selected["vin"], location_allowed, now)
                 except RemoteError as exc:
-                    if not location_allowed or exc.reason != Failure.FORBIDDEN:
+                    if exc.retry_advice is not None:
+                        cache["tesla_retry_after"] = asdict(exc.retry_advice)
+                    if not location_allowed or exc.reason != Failure.FORBIDDEN or exc.retry_after > 0:
                         raise
                     location_allowed = False
                     cache.pop("location", None)
@@ -81,10 +84,13 @@ class VehicleService:
                 # A successful availability check is not a failed live-data read.
                 cache["consecutive_read_errors"] = 0
         except AppError as exc:
+            if isinstance(exc, RemoteError) and exc.retry_advice is not None:
+                cache["tesla_retry_after"] = asdict(exc.retry_advice)
             cache["error"] = str(exc)
             cache["retry_reason"] = exc.reason if isinstance(exc, RemoteError) else None
             if isinstance(exc, RemoteError) and exc.reason == Failure.RATE_LIMITED:
-                cache["retry_at"] = self.clock.now() + exc.retry_after
+                cache["retry_at"] = (tesla_retry_until(cache) if exc.retry_advice is not None
+                                     else self.clock.now() + exc.retry_after)
             if isinstance(exc, RemoteError) and exc.reason == Failure.UNAVAILABLE:
                 cache["state"] = "offline"  # Unavailable is not proof of sleep.
                 cache["consecutive_read_errors"] = 0
@@ -128,10 +134,13 @@ class VehicleService:
             if cache.get("state") != "online" and not cache.get("error"):
                 cache["error"] = "The vehicle has not provided fresh data after waking. Showing the last known range."
         except AppError as exc:
+            if isinstance(exc, RemoteError) and exc.retry_advice is not None:
+                cache["tesla_retry_after"] = asdict(exc.retry_advice)
             cache["error"] = ("Waking requires the Vehicle Commands permission. Connect your Tesla account again."
                               if isinstance(exc, RemoteError) and exc.reason == Failure.FORBIDDEN else str(exc))
             if isinstance(exc, RemoteError) and exc.reason == Failure.RATE_LIMITED:
-                cache["retry_at"] = self.clock.now() + exc.retry_after
+                cache["retry_at"] = (tesla_retry_until(cache) if exc.retry_advice is not None
+                                     else self.clock.now() + exc.retry_after)
                 cache["retry_reason"] = Failure.RATE_LIMITED
         finally:
             cache.pop("wake_in_progress", None)
