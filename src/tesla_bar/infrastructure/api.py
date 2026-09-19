@@ -51,5 +51,5 @@ class Client:
             try:
                 return transport.request_json(REGIONS[self.config["region"]] + path, token=token, **({"body": body} if body is not None else {}))
             except APIError as exc:
-                if exc.status != 401 or attempt:
+                if exc.status != 401 or attempt or exc.retry_after > 0:
                     raise

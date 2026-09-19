@@ -35,7 +35,7 @@ class ReadErrorTests(unittest.TestCase):
             self.profile.write(Record.STATE, self.baseline)
             with patch.object(self.gateway, stage, side_effect=RemoteError(Failure.FORBIDDEN, "Tesla denied access.")):
                 for count in range(1, 5):
-                    self.clock.value += 300
+                    self.clock.value = max(self.clock.now() + 300, self.profile.read(Record.STATE).get("read_retry_at", 0))
                     cache = self.service.fetch_state(self.config)
                     self.assertEqual(consecutive_read_errors(cache), count)
                     self.assertEqual(cache["charge"], self.baseline["charge"])
@@ -62,7 +62,7 @@ class ReadErrorTests(unittest.TestCase):
         for _ in range(3):
             self.service.fetch_state(self.config)
         self.gateway.failure = None
-        self.clock.value += 300
+        self.clock.value = self.profile.read(Record.STATE)["read_retry_at"]
         cache = self.service.fetch_state(self.config)
         self.assertEqual(consecutive_read_errors(cache), 0)
         self.assertFalse(read_error_alert(cache))

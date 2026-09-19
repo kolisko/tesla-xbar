@@ -5,6 +5,7 @@ Contents of this directory. See [Architecture](../../../docs/ARCHITECTURE.md) fo
 | File | Contents |
 | --- | --- |
 | [`models.py`](models.py) | Reading interpretation, range, cable/color/freshness rules, status indicators and command labels. |
+| [`polling.py`](polling.py) | Progressive read-error retry delays, server-deadline precedence and immediate manual-result reuse. |
 | [`commands.py`](commands.py) | `VehicleCommand`, parameter validation and observed-state confirmation rules. |
 | [`settings.py`](settings.py) | Shared settings definitions, defaults, choices and validation. |
 | [`location.py`](location.py) | Geographic coordinate validation. |

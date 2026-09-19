@@ -6,7 +6,7 @@ from ..domain.settings import validate_configuration
 def reset_authorized_state(cache):
     """Preserve last readings; renewed consent is not a new vehicle reading."""
     cache = dict(cache)
-    for key in ("next_poll", "retry_at", "retry_reason", "error", "wake_in_progress"):
+    for key in ("next_poll", "read_retry_at", "manual_refresh_completed_at", "retry_at", "retry_reason", "error", "wake_in_progress"):
         cache.pop(key, None)
     cache["state"] = "unknown"
     return cache

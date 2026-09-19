@@ -9,12 +9,20 @@ from ..domain.settings import SETTINGS
 from ..domain.models import CLIMATE_MODES, LOCK_TRUNK_COMMANDS, STALE_AFTER_SECONDS, COMMAND_LABELS, battery_color, cable_connected, charging_is_current, climate_mode, number, status_is_current, temperature_limits, trunk_open_state, vehicle_range
 from ..domain.location import coordinates
 from ..domain.models import consecutive_read_errors, read_error_alert
+from ..domain.polling import retry_not_before, tesla_retry_until
 
 def safe_text(value):
     value = str(value).replace("|", "¦")
     value = " ".join(value.split())
     value = "".join(c for c in value if c.isprintable())
     return value.lstrip("-")[:180]
+
+
+def local_timestamp(value):
+    try:
+        return dt.datetime.fromtimestamp(value).astimezone().strftime("%d %b %H:%M:%S.%f")[:-3]
+    except (TypeError, ValueError, OSError, OverflowError):
+        return "Unavailable"
 
 class MenuRenderer:
     def __init__(self, context: MenuContext):
@@ -260,7 +268,7 @@ class MenuRenderer:
         lines.extend(self.clima_menu(cache, vehicle_action))
         lines.extend(self.sentry_menu(cache, vehicle_action))
         lines.extend(self.location_menu(cache, config))
-        lines.extend(["---", "Refresh now | refresh=true",
+        lines.extend(["---", self.action("Refresh now", "refresh"),
                       vehicle_action("Wake vehicle and refresh", "wake-refresh"),
                       self.action("Connect Tesla account…", "authorize", terminal=True),
                       self.action("Settings…", "configure", terminal=True)])
@@ -275,15 +283,37 @@ class MenuRenderer:
                 lines.append("--" + self.action(label, "select", vehicle["vin"]))
         lines.extend(["---", "Debug info"])
         lines.append(f"--Consecutive failed refreshes: {consecutive_read_errors(cache)} | color=gray")
+        advice = cache.get("tesla_retry_after")
+        if isinstance(advice, dict) and isinstance(advice.get("value"), str):
+            lines.append(f"--Latest Tesla Retry-After: {safe_text(advice['value']) or '(empty)'} | color=gray")
+            lines.append(f"--Retry-After received: {local_timestamp(advice.get('received_at'))} | color=gray")
+            until = tesla_retry_until(cache)
+            if until:
+                status = "waiting" if until > now else "elapsed"
+                lines.append(f"--Tesla retry not before: {local_timestamp(until)} ({status}) | color=gray")
+            else:
+                lines.append("--Tesla Retry-After could not be parsed; no server deadline. | color=gray")
+        else:
+            lines.append("--Tesla Retry-After: not recorded yet | color=gray")
+        next_attempt = retry_not_before(cache)
+        if next_attempt > now:
+            lines.append(f"--Next automatic API attempt: {local_timestamp(next_attempt)} | color=gray")
+            server_deadline = retry_not_before(cache, manual=True)
+            source = "Tesla Retry-After" if server_deadline >= next_attempt else "local error backoff"
+            lines.append(f"--Waiting for: {source} | color=gray")
+            lines.append("--At the first visible xBar run at or after this time. | color=gray")
+        elif cache.get("polling_paused"):
+            lines.append("--Next automatic API attempt: when the desktop is visible again | color=gray")
+        else:
+            lines.append("--Next automatic API attempt: next visible xBar run | color=gray")
+        if next_attempt > now and cache.get("polling_paused"):
+            lines.append("--Desktop hidden: this attempt also waits for visibility. | color=gray")
         for event, label in (("plugin_runs", "Plugin run"), ("tesla_api_calls", "Tesla API request")):
             times = self.context.diagnostics.get(event, [])
             for i, order in enumerate(("Latest", "Previous")):
                 stamp = "Not recorded yet"
                 if i < len(times):
-                    try:
-                        stamp = dt.datetime.fromtimestamp(times[i]).astimezone().strftime("%d %b %H:%M:%S.%f")[:-3]
-                    except (TypeError, ValueError, OSError, OverflowError):
-                        pass
+                    stamp = local_timestamp(times[i])
                 lines.append(f"--{label} — {order}: {stamp} | color=gray")
         lines.extend(["--Times are local; API requests include error responses. | color=gray",
                       "--Saved readings and skipped refreshes do not count as API requests. | color=gray",
