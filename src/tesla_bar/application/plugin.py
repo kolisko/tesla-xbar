@@ -5,6 +5,7 @@ from .commands import CommandService
 from .location import LocationService
 from ..domain.errors import AppError
 from ..domain.settings import DEFAULTS, SETTINGS
+from ..domain.polling import reuse_manual_refresh
 
 class PluginService:
     def __init__(self, profile: Profile, clock: Clock, accounts: AccountFlow,
@@ -102,7 +103,10 @@ class PluginService:
                 if not config.get("client_id"):
                     cache = {"error": "Complete setup in the Tesla Developer portal and Settings."}
                 else:
-                    visibility = self.desktop.state()
+                    # Our explicit Refresh now is distinct from xBar's built-in
+                    # refresh, which invokes the ordinary `menu` entrypoint.
+                    manual = args.command == "refresh"
+                    visibility = Visibility.VISIBLE if manual else self.desktop.state()
                     if visibility != Visibility.VISIBLE:
                         # Return a presentation-only copy. No Tesla client, token
                         # renewal, map lookup or timestamp/cache mutation occurs.
@@ -110,7 +114,12 @@ class PluginService:
                     else:
                         try:
                             with self.profile.locked(blocking=False):
-                                cache = self.vehicles.fetch_state(config)
+                                cache = self.profile.read(Record.STATE)
+                                if manual or not reuse_manual_refresh(cache, now=self.clock.now()):
+                                    cache = self.vehicles.fetch_state(config, manual=manual)
+                                if manual:
+                                    cache["manual_refresh_completed_at"] = self.clock.now()
+                                    self.profile.write(Record.STATE, cache)
                         except BlockingIOError:
                             cache = self.profile.read(Record.STATE)
                 result.cache = cache

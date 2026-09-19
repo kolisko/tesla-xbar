@@ -4,6 +4,7 @@ These tests use fake Tesla clients and temporary local profiles. They do not req
 
 | File | Coverage |
 | --- | --- |
+| [`test_polling.py`](test_polling.py) | 15/30/60-minute backoff, stable persisted deadlines, recovery, server Retry-After, visibility, explicit manual refresh and redraw reuse, and next-attempt debug output. |
 | [`test_read_errors.py`](test_read_errors.py) | Three-failure warning, neutral placeholders, saved data, successful recovery, offline/sleep exceptions, pauses/backoff, recovered location fallback and Retina error icon. |
 | [`test_diagnostics.py`](test_diagnostics.py) | Four-time history, concurrent writes, paused invocations, dispatched requests/error responses, proxy/OAuth, corruption and pure debug rendering. |
 | [`test_visibility.py`](test_visibility.py) | Hidden/locked/asleep/screen-saver states, fail-closed native probe, zero network work while paused, cached readings and automatic resume. |

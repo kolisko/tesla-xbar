@@ -4,6 +4,8 @@ Release tags use `vMAJOR.MINOR.PATCH`; the installed xBar plugin metadata uses t
 
 ## Unreleased
 
+- Back off automatic API retries by 15 minutes after three read failures, 30 minutes after the next, then one hour per failure. Show the earliest next attempt in Debug info; honor longer Tesla Retry-After deadlines. Make the plugin's Refresh now an explicit attempt that bypasses local backoff and reuses its result for the immediate xBar redraw.
+
 - Show a matching circled-exclamation icon and neutral dash after three consecutive failed vehicle refreshes. Preserve the last known readings and timestamp in the menu; count failures in Debug info. Successful reads reset the warning, while normal vehicle sleep/offline and paused runs do not increment it.
 
 - Add Debug info with the latest two plugin-run and dispatched Tesla-request times, including failed responses, OAuth and signed-command SDK requests. Keep only four private timestamps.

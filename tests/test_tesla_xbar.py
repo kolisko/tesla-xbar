@@ -125,7 +125,8 @@ class Tests(unittest.TestCase):
         self.assertEqual(len(client.calls), 6)
         self.assertEqual(client.wakes, [])
         self.assertNotIn("poll_minutes", app.configuration())
-        self.assertIn("Refresh now | refresh=true", app.render(fresh, config).splitlines())
+        row = next(line for line in app.render(fresh, config).splitlines() if line.startswith("Refresh now |"))
+        self.assertIn('param1="refresh"', row)
 
     def test_next_run_retries_network_or_sleep_error_without_local_delay(self):
         for error in (app.AppError("Offline"), app.APIError(408)):

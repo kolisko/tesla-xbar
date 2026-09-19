@@ -5,6 +5,7 @@ from .location import LocationService
 from ..domain.commands import VehicleCommand
 from ..domain.errors import RemoteError, AppError, Failure
 from ..domain.models import consecutive_read_errors
+from ..domain.polling import read_retry_delay, retry_not_before
 
 class VehicleService:
     def __init__(self, profile: Profile, clock: Clock, gateway_factory: Callable[[dict], VehicleGateway], location: LocationService):
@@ -13,7 +14,7 @@ class VehicleService:
         self.gateway_factory = gateway_factory
         self.location = location
 
-    def fetch_state(self, config, gateway=None):
+    def fetch_state(self, config, gateway=None, *, manual=False):
         cache = self.profile.read(Record.STATE)
         location_enabled = config.get("location_enabled") is True
         if not location_enabled:
@@ -21,10 +22,11 @@ class VehicleService:
             cache.pop("location_error", None)
         now = self.clock.now()
         cache.pop("next_poll", None)
-        if cache.get("retry_reason") == Failure.RATE_LIMITED and now < cache.get("retry_at", 0):
-            self.location.update_location_map(cache, config)
-            self.profile.write(Record.STATE, cache)
+        if now < retry_not_before(cache, manual=manual):
+            # Skipped xBar runs neither make requests nor move the deadline.
             return cache
+        cache.pop("read_retry_at", None)
+        cache.pop("manual_refresh_completed_at", None)
         cache.pop("retry_at", None)
         cache.pop("retry_reason", None)
         cache["vehicle_verified"] = False
@@ -89,6 +91,9 @@ class VehicleService:
             elif reading_in_progress:
                 # Count failed refresh attempts, not each HTTP request/retry.
                 cache["consecutive_read_errors"] = consecutive_read_errors(cache) + 1
+                delay = read_retry_delay(cache)
+                if delay:
+                    cache["read_retry_at"] = self.clock.now() + delay
         self.location.update_location_map(cache, config)
         self.profile.write(Record.STATE, cache)
         return cache

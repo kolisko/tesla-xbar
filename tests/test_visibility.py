@@ -70,16 +70,15 @@ class VisibilityTests(unittest.TestCase):
             if state == Visibility.VISIBLE:
                 continue
             desktop.state.return_value = state
-            for command in ("menu", "refresh"):
-                result = app.handle(Request(command))
-                self.assertEqual(result.cache["charge"], before[Record.STATE]["charge"])
-                self.assertEqual(profile.records, before)
-                self.assertEqual(active_status_icons(result.cache, now=clock.now()), [])
-                self.assertFalse(charging_is_current(result.cache, now=clock.now()))
-                menu = MenuRenderer(MenuContext(clock.now(), "/example/action")).render(result.cache, result.config)
-                self.assertIn("354 km", menu.splitlines()[0])
-                self.assertIn("Automatic refresh paused:", menu)
-                self.assertIn("Last known", menu)
+            result = app.handle(Request("menu"))
+            self.assertEqual(result.cache["charge"], before[Record.STATE]["charge"])
+            self.assertEqual(profile.records, before)
+            self.assertEqual(active_status_icons(result.cache, now=clock.now()), [])
+            self.assertFalse(charging_is_current(result.cache, now=clock.now()))
+            menu = MenuRenderer(MenuContext(clock.now(), "/example/action")).render(result.cache, result.config)
+            self.assertIn("354 km", menu.splitlines()[0])
+            self.assertIn("Automatic refresh paused:", menu)
+            self.assertIn("Last known", menu)
         factory.assert_not_called()
         self.assertEqual(maps.mock_calls, [])
         self.assertEqual(geocoder.mock_calls, [])
