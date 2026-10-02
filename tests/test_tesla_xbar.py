@@ -289,7 +289,7 @@ class Tests(unittest.TestCase):
         http.assert_called_once_with(app.REGIONS["eu"] + "/api/1/vehicles/EXAMPLEVIN/wake_up", token="token", body={})
 
     def test_disconnected_color_thresholds_use_displayed_kilometers(self):
-        for km, expected in ((400, None), (350, None), (349, "#F5A623"), (300, "#F5A623"), (299, "#EF4444")):
+        for km, expected in ((400, None), (250, None), (249, "#F5A623"), (150, "#F5A623"), (149, "#EF4444")):
             cache = {"gui_settings": {"gui_range_display": "Rated"},
                      "charge": {"charging_state": "Disconnected", "battery_range": km / 1.609344}}
             with self.subTest(km=km):

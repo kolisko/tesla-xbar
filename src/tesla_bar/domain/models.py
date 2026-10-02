@@ -107,9 +107,9 @@ def battery_color(cache):
     miles = vehicle_range_miles(cache)
     if connected is False and miles is not None:
         km = math.floor(miles * 1.609344 + 0.5)
-        if km < 300:
+        if km < 150:
             return "#EF4444"
-        if km < 350:
+        if km < 250:
             return "#F5A623"
     return None  # Native text color: white in the user's dark menu bar.
 
