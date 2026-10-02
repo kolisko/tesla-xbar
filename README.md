@@ -45,7 +45,7 @@ Open **Sentry** for on/off controls and **Location** for the address, optional m
 - **Range or percentage:** switch through **Menu bar display**. Range comes directly from Tesla's range fields and uses the vehicle's distance units.
 - **Cable and charging status:** green text when connected, including scheduled or paused charging. Fresh online charging adds a monochrome lightning icon before the label, matching the other status icons.
 - **Live vehicle indicators:** a tent for Camp Mode, a paw for Pet Mode, a fan while climate is on, an open padlock when the vehicle is unlocked, a concentric-circle Sentry symbol when Sentry is on, and separate car silhouettes for an open front or rear trunk. The trunk indicators use their own closure readings independently of the lock state; both can appear together. Active indicators appear together before the range or percentage; their states also appear in the menu.
-- **Low-range colors:** orange below 350 km and red below 300 km when unplugged. Connected cable status takes precedence.
+- **Low-range colors:** orange below 250 km and red below 150 km when unplugged. Connected cable status takes precedence.
 - **Last known data:** asleep and offline readings keep the saved range or percentage and add a small trailing dot, such as `360 km ·` or `73% ·`. A last known connected cable stays green, and unplugged readings keep the normal range colors. The connection state and original reading timestamp stay visible in the menu.
 - **Repeated read failures:** after three consecutive failed refreshes, a monochrome circled exclamation replaces live indicators and the label becomes `— km`, `— mi` or `—%` in the native text color. The menu keeps the last known readings and their original timestamp. Successful refreshes clear the warning; confirmed offline/asleep states and unavailable-vehicle responses do not count as failures. Paused/skipped runs leave the count unchanged.
 - **Error backoff:** after the third failed refresh, the next automatic attempt waits 15 minutes; another failure waits 30 minutes, then further failures wait one hour each. xBar still runs on its usual schedule, displaying saved state until the deadline. Success resets the backoff. Tesla's longer `Retry-After` takes precedence.
@@ -113,7 +113,7 @@ Choose **Settings…** in the plugin menu to open the interactive Terminal promp
 
 The shared [`settings schema`](src/tesla_bar/domain/settings.py) defines defaults, menu choices and validation for profile loading, the Terminal prompts, the optional local browser form (`tesla-action.sh provision`), and installer checks. Neither installer path rewrites existing settings. Saving the same application settings preserves its cached readings; changing Client ID requires the new app’s secret and clears the old login/vehicle selection.
 
-[`config.example.json`](examples/config.example.json) shows placeholder settings for reference. It is not the live configuration file and is not automatically copied over your profile. The color thresholds (orange below 350 km, red below 300 km when unplugged) are currently code constants, not configurable JSON fields.
+[`config.example.json`](examples/config.example.json) shows placeholder settings for reference. It is not the live configuration file and is not automatically copied over your profile. The color thresholds (orange below 250 km, red below 150 km when unplugged) are currently code constants, not configurable JSON fields.
 
 | Stored item | Contents and handling |
 | --- | --- |

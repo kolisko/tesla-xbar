@@ -74,7 +74,7 @@ body += text(28, 486, 'Illustrative data', 17, '#a0a6ad')
 
 body = '<rect width="1326" height="380" rx="20" fill="#111c29"/>'
 examples = [('Charging', '360 km', '#32cd66', 'bolt'), ('Connected · paused', '360 km', '#32cd66', ''),
-            ('Unplugged · below 350 km', '320 km', '#f5a623', ''), ('Unplugged · below 300 km', '280 km', '#ef4444', ''),
+            ('Unplugged · below 250 km', '220 km', '#f5a623', ''), ('Unplugged · below 150 km', '140 km', '#ef4444', ''),
             ('Asleep · last connected', '360 km ·', '#32cd66', ''), ('Offline · last connected', '360 km ·', '#32cd66', ''),
             ('Asleep · last unplugged', '360 km ·', '#e5e9ed', ''), ('Offline · last unplugged', '360 km ·', '#e5e9ed', '')]
 for i, (label, value, color, icon) in enumerate(examples):

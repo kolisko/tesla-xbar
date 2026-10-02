@@ -4,6 +4,8 @@ Release tags use `vMAJOR.MINOR.PATCH`; the installed xBar plugin metadata uses t
 
 ## Unreleased
 
+- Use orange below 250 km and red below 150 km when unplugged; a connected cable still takes precedence with green text.
+
 - Back off automatic API retries by 15 minutes after three read failures, 30 minutes after the next, then one hour per failure. Show the earliest next attempt in Debug info; honor longer Tesla Retry-After deadlines. Make the plugin's Refresh now an explicit attempt that bypasses local backoff and reuses its result for the immediate xBar redraw.
 - Show Tesla's latest recorded Retry-After value, receipt time, server deadline and whether Tesla or local backoff determines the next attempt. Honor seconds/date advice on surfaced read/wake errors beyond HTTP 429; never invent missing headers.
 

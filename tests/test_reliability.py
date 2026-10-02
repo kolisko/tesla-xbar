@@ -40,7 +40,7 @@ class ReliabilityTests(unittest.TestCase):
             for charge, gui, color in ((baseline["charge"], baseline["gui_settings"], "#32CD66"),
                                        (baseline["charge"], {}, "#32CD66"), ({}, {}, None),
                                        (baseline["charge"] | {"charging_state": "Disconnected"},
-                                        baseline["gui_settings"], "#EF4444")):
+                                        baseline["gui_settings"], "#F5A623")):
                 cache = baseline | {"state": state, "charge": charge, "gui_settings": gui}
                 top = app.render(cache, self.config).splitlines()[0]
                 value = "161 km" if gui else "—"
@@ -107,7 +107,7 @@ class ReliabilityTests(unittest.TestCase):
         with patch.object(time, "time", return_value=10_000):
             cache = self.seed()
             for charging_state, color in (("Charging", "#32CD66"), ("Stopped", "#32CD66"),
-                                           ("Disconnected", "#EF4444")):
+                                           ("Disconnected", "#F5A623")):
                 cache["charge"]["charging_state"] = charging_state
                 for changes in ({"error": "Network unavailable"},
                                 {"updated_at": 10_000 - app.STALE_AFTER_SECONDS}):
@@ -132,7 +132,7 @@ class ReliabilityTests(unittest.TestCase):
         with patch.object(client, "get", side_effect=get):
             cache = app.fetch_state(self.config, client=client)
         menu = app.render(cache, self.config)
-        self.assertEqual(menu.splitlines()[0], "161 km | color=#EF4444")
+        self.assertEqual(menu.splitlines()[0], "161 km | color=#F5A623")
         self.assertIn("Cable: disconnected", menu)
         self.assertNotIn("Last known cable state", menu)
 
