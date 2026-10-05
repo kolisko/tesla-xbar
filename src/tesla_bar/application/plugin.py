@@ -3,6 +3,7 @@ from .ports import Profile, Clock, AccountFlow, Request, Result, Record, Desktop
 from .vehicle import VehicleService
 from .commands import CommandService
 from .location import LocationService
+from .resume import ResumeService
 from ..domain.errors import AppError
 from ..domain.settings import DEFAULTS, SETTINGS
 from ..domain.polling import reuse_manual_refresh
@@ -14,6 +15,7 @@ class PluginService:
         self.profile, self.clock, self.accounts = profile, clock, accounts
         self.vehicles, self.commands, self.location = vehicles, commands, location
         self.desktop = desktop
+        self.resume = ResumeService(profile, clock, desktop)
 
     def handle(self, args: Request):
         config = dict(DEFAULTS)
@@ -114,8 +116,12 @@ class PluginService:
                     else:
                         try:
                             with self.profile.locked(blocking=False):
+                                config = self.profile.configuration()
                                 cache = self.profile.read(Record.STATE)
-                                if manual or not reuse_manual_refresh(cache, now=self.clock.now()):
+                                resume_wake = not manual and self.resume.claim(config, cache)
+                                if resume_wake:
+                                    cache = self.vehicles.wake_and_refresh(config)
+                                elif manual or not reuse_manual_refresh(cache, now=self.clock.now()):
                                     cache = self.vehicles.fetch_state(config, manual=manual)
                                 if manual:
                                     cache["manual_refresh_completed_at"] = self.clock.now()

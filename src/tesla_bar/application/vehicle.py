@@ -105,15 +105,21 @@ class VehicleService:
         return cache
 
     def wake_and_refresh(self, config, gateway=None, timeout=90):
-        """Explicit menu action only. Send at most one wake request, then read status."""
+        """Manual action or claimed Mac resume. At most one wake, then read status."""
+        cache = self.profile.read(Record.STATE)
+        if self.clock.now() < retry_not_before(cache):
+            return cache
         config = self.pinned_vehicle_config(config)
         gateway = gateway or self.gateway_factory(config)
         cache = self.fetch_state(config, gateway=gateway)
+        if self.clock.now() < retry_not_before(cache):
+            return cache
         if cache.get("error") and cache.get("retry_reason") == Failure.UNAVAILABLE and cache.get("vehicle_verified"):
             cache.pop("error", None)
             cache.pop("retry_at", None)
             cache.pop("retry_reason", None)
-        if cache.get("error") or cache.get("state") == "online" or not cache.get("vin"):
+        if (cache.get("error") or cache.get("state") == "online"
+                or not cache.get("vehicle_verified") or not cache.get("vin")):
             return cache
         vin = cache["vin"]
         cache["wake_in_progress"] = True

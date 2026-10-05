@@ -3,6 +3,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import ContextManager, Protocol
 from ..domain.commands import VehicleCommand
+from ..domain.resume import SleepCycle
 
 
 class Record(Enum):
@@ -10,6 +11,7 @@ class Record(Enum):
     COMMAND_RESULT = "command_result"
     COMMAND_SETUP = "command_setup"
     ACTION_NOTICE = "action_notice"
+    RESUME = "resume"
 
 
 class Clock(Protocol):
@@ -30,6 +32,7 @@ class Visibility(Enum):
 
 class Desktop(Protocol):
     def state(self) -> Visibility: ...
+    def sleep_cycle(self) -> SleepCycle | None: ...
 
 
 class Profile(Protocol):
@@ -104,6 +107,7 @@ class MenuContext:
     notice: dict = field(default_factory=dict)
     setup: dict = field(default_factory=dict)
     diagnostics: dict = field(default_factory=dict)
+    resume: dict = field(default_factory=dict)
 
 
 class IdentityProvider(Protocol):
