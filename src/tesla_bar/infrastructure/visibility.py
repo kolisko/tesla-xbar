@@ -1,8 +1,22 @@
 """Read desktop availability without permissions, a daemon or network calls."""
 import json
+import re
 import subprocess
 from . import runtime
 from ..application.ports import Visibility
+from ..domain.resume import SleepCycle
+
+
+def sleep_cycle_from_output(output):
+    values = {}
+    for line in output.splitlines():
+        match = re.fullmatch(r"kern\.(boottime|sleeptime|waketime): \{ sec = (\d+), usec = (\d+) \}.*", line)
+        if not match or match[1] in values or int(match[3]) >= 1_000_000:
+            return None
+        values[match[1]] = int(match[2]) + int(match[3]) / 1_000_000
+    if values.keys() != {"boottime", "sleeptime", "waketime"}:
+        return None
+    return SleepCycle(values["boottime"], values["sleeptime"], values["waketime"])
 
 
 def visibility_from_snapshot(snapshot):
@@ -25,6 +39,18 @@ def visibility_from_snapshot(snapshot):
 
 
 class DesktopVisibility:
+    def sleep_cycle(self):
+        # Kernel sleep/wake timestamps, not screen idle time or plugin run gaps.
+        # No resident observer, elevated permissions or Tesla requests.
+        try:
+            result = subprocess.run(["/usr/sbin/sysctl", "kern.boottime", "kern.sleeptime", "kern.waketime"],
+                                    capture_output=True, text=True, timeout=3)
+            if result.returncode == 0:
+                return sleep_cycle_from_output(result.stdout)
+        except (OSError, subprocess.SubprocessError, ValueError):
+            pass
+        return None
+
     def state(self):
         try:
             result = subprocess.run([str(runtime.HERE / "tesla-visibility")],

@@ -308,6 +308,15 @@ class MenuRenderer:
             lines.append("--Next automatic API attempt: next visible xBar run | color=gray")
         if next_attempt > now and cache.get("polling_paused"):
             lines.append("--Desktop hidden: this attempt also waits for visibility. | color=gray")
+        resume = self.context.resume
+        slept, woke = resume.get("last_sleep_at"), resume.get("last_wake_at")
+        if number(slept) and number(woke) and woke > slept:
+            lines.append(f"--Last observed Mac sleep: {(woke - slept) / 60:.1f} min | color=gray")
+        if resume.get("pending"):
+            lines.append("--Mac resume refresh: pending until visible and retry is due | color=gray")
+        elif number(resume.get("handled_at")):
+            label = "already refreshed" if resume.get("outcome") == "already_refreshed" else "attempted"
+            lines.append(f"--Mac resume refresh: {label} {local_timestamp(resume['handled_at'])} | color=gray")
         for event, label in (("plugin_runs", "Plugin run"), ("tesla_api_calls", "Tesla API request")):
             times = self.context.diagnostics.get(event, [])
             for i, order in enumerate(("Latest", "Previous")):

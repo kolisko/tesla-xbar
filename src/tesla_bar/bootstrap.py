@@ -35,7 +35,7 @@ def menu_context(profile, clock, maps, cache):
     return MenuContext(now, str(runtime.APP_DIR / "tesla-action.sh"),
         display.status_icon_bytes(active_status_icons(cache, now=now)), maps.saved(cache),
         profile.read(Record.COMMAND_RESULT), profile.read(Record.ACTION_NOTICE), profile.read(Record.COMMAND_SETUP),
-        diagnostics.snapshot())
+        diagnostics.snapshot(), profile.read(Record.RESUME))
 
 
 def present(result, profile, clock, maps):

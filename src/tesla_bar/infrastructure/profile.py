@@ -10,6 +10,7 @@ RECORD_FILES = {
     Record.COMMAND_RESULT: "command-result.json",
     Record.COMMAND_SETUP: "command-setup.json",
     Record.ACTION_NOTICE: "action-notice.json",
+    Record.RESUME: "mac-resume.json",
 }
 
 

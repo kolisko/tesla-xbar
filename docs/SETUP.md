@@ -46,7 +46,7 @@ Create your application in the [Tesla Developer portal](https://developer.tesla.
 | Grant types | Authorization Code and Client Credentials / Machine-to-Machine |
 | Vehicle access | Vehicle Information, Vehicle Commands, Vehicle Charging Management |
 
-The plugin requests `openid offline_access vehicle_device_data vehicle_cmds vehicle_charging_cmds`. Command scopes cover the explicit wake, charging, climate, Sentry, lock and trunk controls. Location is optional: enable **Vehicle Location** for the developer app, then choose **Location → Enable Location…** and approve that scope on Tesla’s consent page. This adds `vehicle_location`. No energy-product scopes are requested. Tesla's charging scope may cover more information than this plugin uses; inspect Tesla's consent page before granting access.
+The plugin requests `openid offline_access vehicle_device_data vehicle_cmds vehicle_charging_cmds`. Command scopes cover explicit wake, the one-shot wake after a long Mac sleep, charging, climate, Sentry, lock and trunk controls. Location is optional: enable **Vehicle Location** for the developer app, then choose **Location → Enable Location…** and approve that scope on Tesla’s consent page. This adds `vehicle_location`. No energy-product scopes are requested. Tesla's charging scope may cover more information than this plugin uses; inspect Tesla's consent page before granting access.
 
 Complete any required app review and billing setup in the portal. Keep your Client Secret private. See [Tesla's authentication guide](https://developer.tesla.com/docs/fleet-api/authentication/overview) and [billing documentation](https://developer.tesla.com/docs/fleet-api/billing-and-limits).
 
@@ -128,7 +128,7 @@ Both paths preserve configuration, keys, tokens, saved readings and the active w
 
 ## Troubleshooting
 
-- **Offline / asleep:** the last known reading remains visible. A small trailing dot marks offline/asleep (for example, `360 km ·`). A last known connected cable keeps the text green; unplugged readings keep their usual range color. The original timestamp and **Last known cable state** remain in the menu. Use the explicit wake action only when you want to wake the car.
+- **Offline / asleep:** the last known reading remains visible. A small trailing dot marks offline/asleep (for example, `360 km ·`). A last known connected cable keeps the text green; unplugged readings keep their usual range color. The original timestamp and **Last known cable state** remain in the menu. Use the explicit wake action to wake the car on demand. A recorded Mac sleep longer than one hour also permits one automatic wake on the next eligible visible plugin run.
 - **No data yet:** confirm registration, region, consent and the vehicle's connectivity.
 - **Missing key:** pair your own app key in the Tesla mobile app. Do not create a new key to fix an existing profile unless you also update the hosted public key and vehicle pairing.
 - **Expired login:** reconnect the account. Tokens normally refresh automatically.
@@ -162,9 +162,11 @@ The map preview uses `location_map_enabled` (default `false`) and the `tesla-map
 
 ## Refresh only while the desktop is visible
 
-New installations refresh every five minutes. Change the interval through xBar's plugin management; the installer preserves existing intervals. `Refresh now` follows the same visibility check. Automatic requests pause while displays are asleep, your session is locked/inactive, a screen saver covers a display, or macOS reports the menu bar hidden. Saved readings and their original timestamps remain available. Updates resume at the next xBar run after the desktop is visible again (up to the configured interval), or when you choose **Refresh now**.
+New installations refresh every five minutes. Change the interval through xBar's plugin management; the installer preserves existing intervals. The plugin’s explicit **Refresh now** bypasses visibility and local error backoff, but still honors Tesla Retry-After; it does not wake the car. Automatic requests pause while displays are asleep, your session is locked/inactive, a screen saver covers a display, or macOS reports the menu bar hidden. Saved readings and their original timestamps remain available. Updates resume at the next xBar run after the desktop is visible again (up to the configured interval), or when you choose **Refresh now**.
 
 If the menu reports **desktop visibility unavailable**, update the installation so `tesla-visibility` is present. The helper needs no Screen Recording or Accessibility permission. A failed probe pauses routine requests; explicit vehicle controls still operate when you choose them. An already running request may finish when the screen turns off.
+
+After a **recorded system sleep longer than one hour**, the first eligible visible run also checks the selected car, wakes it once if needed and then reads fresh data. A screen saver, display sleep or simply stopping xBar is insufficient. The first valid observation/reboot establishes a baseline; old sleeps do not immediately wake a car after installation. Retry deadlines can postpone the attempt. A failed wake is not automatically repeated for the same sleep. No resident process is required. Debug info shows the last observed Mac sleep and whether its refresh is pending or has been attempted.
 
 ## Debug info
 
