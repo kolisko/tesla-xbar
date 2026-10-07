@@ -89,8 +89,10 @@ class ResumeTests(unittest.TestCase):
                 continue
             self.desktop.state.return_value = visibility
             self.app.handle(Request())
-            self.assertEqual(self.profile.records, before)
+            self.assertEqual(self.profile.read(Record.STATE), before[Record.STATE])
+            self.assertEqual(self.gateway.commands, [])
         self.desktop.state.return_value = Visibility.VISIBLE
+        before = copy.deepcopy(self.profile.records)
         self.profile.busy = True
         self.app.handle(Request())
         self.assertEqual(self.profile.records, before)
@@ -241,6 +243,206 @@ class ResumeTests(unittest.TestCase):
         resume.update(handled_at=6001, outcome="refresh_attempted")
         menu = MenuRenderer(MenuContext(6001, "/example/action", resume=resume)).render({}, {})
         self.assertIn("Mac resume refresh: attempted", menu)
+
+    def test_each_inactive_state_wakes_on_return_without_any_new_kernel_sleep(self):
+        baseline = copy.deepcopy(self.profile.records)
+        for state in (Visibility.LOCKED, Visibility.DISPLAY_OFF, Visibility.SCREENSAVER, Visibility.INACTIVE):
+            with self.subTest(state=state):
+                self.profile.records = copy.deepcopy(baseline)
+                self.gateway.calls.clear()
+                self.gateway.commands.clear()
+                self.factory.reset_mock()
+                self.clock.value = 2100
+                self.desktop.state.return_value = state
+                self.app.handle(Request())
+                self.clock.value = 2100 + 3900
+                self.app.handle(Request())
+                self.assertEqual(self.profile.read(Record.STATE), baseline[Record.STATE])
+                self.assertEqual(self.profile.read(Record.RESUME)["inactive_since"], 2100)
+                self.factory.assert_not_called()
+                self.gateway.state = "asleep"
+                self.desktop.state.return_value = Visibility.VISIBLE
+                result = self.app.handle(Request())
+                self.assertEqual([c.name for c in self.gateway.commands], ["wake"])
+                self.assertEqual(self.gateway.calls.count("reading"), 1)
+                self.assertEqual(result.cache["updated_at"], self.clock.now())
+                self.gateway.state = "asleep"
+                self.clock.value += 300
+                self.app.handle(Request())
+                self.assertEqual(len(self.gateway.commands), 1)
+
+    def test_locked_display_off_and_saver_share_one_persisted_absence(self):
+        self.clock.value = 2100
+        self.desktop.state.return_value = Visibility.LOCKED
+        self.app.handle(Request())
+        for offset, state in ((1200, Visibility.DISPLAY_OFF), (3900, Visibility.SCREENSAVER)):
+            self.clock.value = 2100 + offset
+            self.desktop.state.return_value = state
+            restarted = PluginService(self.profile, self.clock, Mock(), self.vehicles, Mock(), self.location, self.desktop)
+            restarted.handle(Request())
+        self.assertEqual(self.profile.read(Record.RESUME)["inactive_since"], 2100)
+        self.gateway.state = "asleep"
+        self.desktop.state.return_value = Visibility.VISIBLE
+        restarted.handle(Request())
+        self.assertEqual(len(self.gateway.commands), 1)
+
+    def test_short_absence_and_gap_between_visible_runs_never_wake(self):
+        baseline = copy.deepcopy(self.profile.records)
+        for seconds in (1, 3599, 3600):
+            self.profile.records = copy.deepcopy(baseline)
+            self.clock.value = 2100
+            self.desktop.state.return_value = Visibility.LOCKED
+            self.app.handle(Request())
+            self.clock.value += seconds
+            self.desktop.state.return_value = Visibility.VISIBLE
+            self.gateway.state = "asleep"
+            self.app.handle(Request())
+            self.assertEqual(self.gateway.commands, [])
+        self.clock.value += 86400
+        self.app.handle(Request())  # xBar was stopped; no observed absence.
+        self.assertEqual(self.gateway.commands, [])
+
+    def test_hidden_menu_or_unknown_visibility_do_not_count_and_break_absence(self):
+        baseline = copy.deepcopy(self.profile.records)
+        for state in (Visibility.BAR_HIDDEN, Visibility.UNKNOWN):
+            for start_locked in (False, True):
+                self.profile.records = copy.deepcopy(baseline)
+                self.clock.value = 2100
+                self.desktop.state.return_value = Visibility.LOCKED if start_locked else state
+                self.app.handle(Request())
+                self.clock.value += 1200
+                self.desktop.state.return_value = state
+                self.app.handle(Request())
+                self.clock.value += 3900
+                self.desktop.state.return_value = Visibility.VISIBLE
+                self.gateway.state = "asleep"
+                self.app.handle(Request())
+                self.assertEqual(self.gateway.commands, [])
+
+    def test_soft_and_system_sleep_are_one_wake_opportunity(self):
+        self.clock.value = 2100
+        self.desktop.state.return_value = Visibility.LOCKED
+        self.app.handle(Request())
+        self.clock.value = 6200
+        self.desktop.sleep_cycle.return_value = SleepCycle(100, 2200, 6100)
+        self.desktop.state.return_value = Visibility.VISIBLE
+        self.gateway.state = "asleep"
+        self.app.handle(Request())
+        self.clock.value += 300
+        self.gateway.state = "asleep"
+        self.app.handle(Request())
+        self.assertEqual(len(self.gateway.commands), 1)
+        self.assertEqual(self.gateway.calls.count("reading"), 1)
+
+    def test_unlock_to_fullscreen_queues_resume_but_waits_for_visible_bar(self):
+        self.clock.value = 2100
+        self.desktop.state.return_value = Visibility.LOCKED
+        self.app.handle(Request())
+        self.clock.value = 6000
+        self.desktop.state.return_value = Visibility.BAR_HIDDEN
+        self.app.handle(Request())
+        self.assertIn("pending", self.profile.read(Record.RESUME))
+        self.factory.assert_not_called()
+        self.clock.value += 300
+        self.desktop.state.return_value = Visibility.VISIBLE
+        self.gateway.state = "asleep"
+        self.app.handle(Request())
+        self.assertEqual(len(self.gateway.commands), 1)
+
+    def test_return_after_lock_defers_for_backoff_then_attempts_once(self):
+        self.clock.value = 2100
+        self.desktop.state.return_value = Visibility.LOCKED
+        self.app.handle(Request())
+        self.clock.value = 6000
+        self.desktop.state.return_value = Visibility.VISIBLE
+        self.gateway.state = "asleep"
+        cache = self.profile.read(Record.STATE) | {"consecutive_read_errors": 3,
+            "read_retry_at": 7000, "tesla_retry_after": {"received_at": 6000, "delay": 2000}}
+        self.profile.write(Record.STATE, cache)
+        self.app.handle(Request())
+        self.assertIn("pending", self.profile.read(Record.RESUME))
+        self.factory.assert_not_called()
+        self.clock.value = 7999
+        self.app.handle(Request())
+        self.factory.assert_not_called()
+        self.clock.value = 8000
+        self.app.handle(Request())
+        self.assertEqual(len(self.gateway.commands), 1)
+
+    def test_manual_refresh_after_unlock_satisfies_absence_without_wake_or_duplicate(self):
+        self.clock.value = 2100
+        self.desktop.state.return_value = Visibility.LOCKED
+        self.app.handle(Request())
+        self.clock.value = 6000
+        self.desktop.state.return_value = Visibility.VISIBLE
+        self.app.handle(Request("refresh"))
+        self.assertIn("pending", self.profile.read(Record.RESUME))
+        self.app.handle(Request())
+        self.assertEqual(self.gateway.calls, ["vehicles", "reading"])
+        self.assertEqual(self.gateway.commands, [])
+        self.assertEqual(self.profile.read(Record.RESUME)["outcome"], "already_refreshed")
+
+    def test_manual_refresh_while_locked_does_not_fabricate_a_return(self):
+        self.clock.value = 2100
+        self.desktop.state.return_value = Visibility.LOCKED
+        self.app.handle(Request())
+        self.clock.value = 6000
+        self.app.handle(Request("refresh"))
+        self.assertEqual(self.profile.read(Record.RESUME)["inactive_since"], 2100)
+        self.assertEqual(self.gateway.commands, [])
+        self.clock.value += 300
+        self.desktop.state.return_value = Visibility.VISIBLE
+        self.gateway.state = "asleep"
+        self.app.handle(Request())
+        self.assertEqual(len(self.gateway.commands), 1)
+
+    def test_reboot_or_vehicle_change_during_absence_does_not_wake_old_vehicle(self):
+        self.clock.value = 2100
+        self.desktop.state.return_value = Visibility.LOCKED
+        self.app.handle(Request())
+        baseline = copy.deepcopy(self.profile.records)
+        self.clock.value = 6000
+        self.desktop.state.return_value = Visibility.VISIBLE
+        self.desktop.sleep_cycle.return_value = SleepCycle(5500, 0, 0)
+        self.gateway.state = "asleep"
+        self.app.handle(Request())
+        self.assertEqual(self.gateway.commands, [])
+        self.profile.records = baseline
+        self.desktop.sleep_cycle.return_value = SleepCycle(100, 0, 0)
+        self.profile.config["vin"] = "OTHER"
+        self.app.handle(Request())
+        self.assertEqual(self.gateway.commands, [])
+
+    def test_busy_unlock_leaves_absence_for_next_run_and_failed_wake_is_not_replayed(self):
+        self.clock.value = 2100
+        self.desktop.state.return_value = Visibility.LOCKED
+        self.app.handle(Request())
+        self.clock.value = 6000
+        self.desktop.state.return_value = Visibility.VISIBLE
+        self.profile.busy = True
+        self.app.handle(Request())
+        self.factory.assert_not_called()
+        self.assertEqual(self.profile.read(Record.RESUME)["inactive_since"], 2100)
+        self.profile.busy = False
+        self.gateway.state = "asleep"
+        def fail(command):
+            self.gateway.commands.append(command)
+            raise AppError("Network unavailable")
+        self.gateway.execute = fail
+        self.app.handle(Request())
+        self.clock.value += 300
+        self.app.handle(Request())
+        self.assertEqual(len(self.gateway.commands), 1)
+
+    def test_debug_shows_inactivity_start_and_duration_without_vehicle_identifier(self):
+        resume = {"inactive_since": 2100, "inactive_reason": "locked", "inactive_vin": "PRIVATEVIN"}
+        menu = MenuRenderer(MenuContext(6000, "/example/action", resume=resume)).render({}, {})
+        self.assertIn("Mac inactive since:", menu)
+        self.assertIn("(locked)", menu)
+        self.assertNotIn("PRIVATEVIN", menu)
+        resume = {"last_inactive_at": 2100, "last_active_at": 6000}
+        menu = MenuRenderer(MenuContext(6000, "/example/action", resume=resume)).render({}, {})
+        self.assertIn("Last observed Mac inactivity: 65.0 min", menu)
 
 
 class SleepProbeTests(unittest.TestCase):

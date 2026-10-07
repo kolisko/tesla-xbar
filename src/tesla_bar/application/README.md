@@ -7,7 +7,7 @@ Contents of this directory. See [Architecture](../../../docs/ARCHITECTURE.md) fo
 | [`ports.py`](ports.py) | Profile, clock, vehicle, credentials, identity, input, map/geocoder contracts; request/result/menu context. |
 | [`plugin.py`](plugin.py) | Dispatch application requests, hold locks and return data/results. |
 | [`vehicle.py`](vehicle.py) | Vehicle selection, refresh, last-reading retention and manual/resume wake wait. |
-| [`resume.py`](resume.py) | Claim and persist a Mac-resume opportunity under the operation lock, respecting retry deadlines and fresh manual results. |
+| [`resume.py`](resume.py) | Observe Mac inactivity/sleep and claim a single resume opportunity under the operation lock, respecting retry deadlines and fresh manual results. |
 | [`commands.py`](commands.py) | Consent/current-state checks, semantic command dispatch and result verification. |
 | [`accounts.py`](accounts.py) | Account registration and profile updates after authorization. |
 | [`settings.py`](settings.py) | Shared settings/credential update rules. |

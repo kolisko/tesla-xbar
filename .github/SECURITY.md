@@ -15,7 +15,7 @@ The public repository contains code, tests and fictional previews. Each user own
 - Keys are created outside the checkout. Updates preserve existing profiles and never silently replace a missing key on an existing profile.
 - The OAuth callback is temporary and loopback-only; it validates state and Host. Codes are not logged.
 - Signed command tokens are passed through stdin. Raw helper errors are redacted.
-- Physical controls require explicit menu actions and a validated vehicle target. The sole automatic exception is one wake opportunity after a recorded Mac system sleep longer than one hour, on a visible desktop and subject to retry deadlines. It is bound to the selected vehicle and consumed before dispatch so uncertain commands are not replayed.
+- Physical controls require explicit menu actions and a validated vehicle target. The sole automatic exception is one wake opportunity after more than one hour of observed Mac inactivity (lock, display-off, screen saver or inactive session) or recorded system sleep, on a visible desktop and subject to retry deadlines. It is bound to the selected vehicle and consumed before dispatch so uncertain commands are not replayed.
 - A local administrator or a process acting as the same macOS user may access local data. Filesystem permissions do not isolate malware running as the account owner.
 
 ## Repository checks

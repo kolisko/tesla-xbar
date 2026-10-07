@@ -4,6 +4,8 @@ Release tags use `vMAJOR.MINOR.PATCH`; the installed xBar plugin metadata uses t
 
 ## Unreleased
 
+- Include observed lock, display-off, screen-saver and inactive-session periods in the one-hour Mac-resume wake rule. Track inactivity without Tesla traffic, merge it with system sleep into one wake opportunity, and expose its start/duration in Debug info.
+
 - Wake the selected vehicle once if needed after a recorded Mac system sleep longer than one hour, at the next eligible visible xBar run. Preserve retry deadlines and operation locking, avoid replay after failed/uncertain attempts, and show resume status in Debug info.
 
 - Use orange below 250 km and red below 150 km when unplugged; a connected cable still takes precedence with green text.

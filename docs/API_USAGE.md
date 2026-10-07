@@ -1,6 +1,6 @@
 # API usage review
 
-Review date: 2026-10-05. This is a source-level request audit, not a historical billing report or a capture of a user's vehicle responses. Implemented savings include desktop visibility gating, the five-minute default, progressive error backoff and reuse of the plugin's explicit Refresh now result during the immediate menu redraw. The remaining proposals below are **not** implemented.
+Review date: 2026-10-07. This is a source-level request audit, not a historical billing report or a capture of a user's vehicle responses. Implemented savings include desktop visibility gating, the five-minute default, progressive error backoff and reuse of the plugin's explicit Refresh now result during the immediate menu redraw. The remaining proposals below are **not** implemented.
 
 ## Requests in one invocation
 
@@ -17,11 +17,11 @@ Counts assume valid cached authorization, no concurrent action and no API error 
 | Access token due to expire | **+1** OAuth renewal, normally reused by the rest of the invocation | None |
 | HTTP 401 without an active Retry-After | One forced OAuth renewal and one retry of that request | None |
 | Location-inclusive live read returns HTTP 403 without an active Retry-After | **3** total: list, rejected combined read, combined read without location | No new location lookup |
-| Mac resume after a recorded sleep longer than one hour | Same bounded sequence as explicit wake when the car is offline; ordinary two reads when already online. At most one attempt per observed sleep, subject to visibility and retry deadlines | Normal location/map work if needed |
+| Mac return after observed inactivity or recorded sleep longer than one hour | Same bounded sequence as explicit wake when the car is offline; ordinary two reads when already online. At most one attempt per absence, subject to visibility and retry deadlines | Normal location/map work if needed |
 | Explicit wake while offline | Initial availability read, **one wake**, status checks every five seconds for up to 90 seconds, then final availability/live reads if online | May update location/map afterwards |
 | Explicit successful vehicle command while online | Preflight list + live read + capabilities, command transport, then list + live read for verification | May update location/map afterwards |
 
-The last row is **five reads plus the command transport**. A legacy REST command adds one request, for six total before xBar's follow-up refresh. Signed commands may need session negotiation/retries inside Tesla's SDK, so one CLI execution is not necessarily one HTTP request. Climate power transitions can send two commands. Ordinary polling never invokes the command SDK or wake endpoint. The one-shot Mac-resume exception uses the wake endpoint after a recorded system sleep longer than an hour; it does not run on every poll.
+The last row is **five reads plus the command transport**. A legacy REST command adds one request, for six total before xBar's follow-up refresh. Signed commands may need session negotiation/retries inside Tesla's SDK, so one CLI execution is not necessarily one HTTP request. Climate power transitions can send two commands. Ordinary polling never invokes the command SDK or wake endpoint. The one-shot Mac-resume exception uses the wake endpoint after more than an hour of observed inactivity (lock, display-off, screen saver or inactive session) or recorded system sleep; it does not run on every poll.
 
 After three failed refresh attempts, the next automatic attempt waits 15 minutes, then 30 minutes after the next failure, then one hour after each further failure. Waiting invocations do not advance the failure count or deadline. This applies to access/billing failures, network errors, invalid readings and rate limits (including those without `Retry-After`); a longer server deadline wins. Normal offline/asleep/unavailable-vehicle responses reset the error state. The plugin's own **Refresh now** is a separate explicit action; built-in xBar refreshes cannot bypass the local wait. Debug info shows the earliest retry time, subject to the next visible xBar run.
 
