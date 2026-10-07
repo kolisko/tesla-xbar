@@ -108,17 +108,13 @@ class PluginService:
                     # Our explicit Refresh now is distinct from xBar's built-in
                     # refresh, which invokes the ordinary `menu` entrypoint.
                     manual = args.command == "refresh"
-                    visibility = Visibility.VISIBLE if manual else self.desktop.state()
-                    if visibility != Visibility.VISIBLE:
-                        # Return a presentation-only copy. No Tesla client, token
-                        # renewal, map lookup or timestamp/cache mutation occurs.
-                        cache = self.profile.read(Record.STATE) | {"polling_paused": visibility.value}
-                    else:
-                        try:
-                            with self.profile.locked(blocking=False):
-                                config = self.profile.configuration()
-                                cache = self.profile.read(Record.STATE)
-                                resume_wake = not manual and self.resume.claim(config, cache)
+                    visibility = self.desktop.state()
+                    try:
+                        with self.profile.locked(blocking=False):
+                            config = self.profile.configuration()
+                            cache = self.profile.read(Record.STATE)
+                            resume_wake = self.resume.observe(config, cache, visibility, may_wake=not manual)
+                            if manual or visibility == Visibility.VISIBLE:
                                 if resume_wake:
                                     cache = self.vehicles.wake_and_refresh(config)
                                 elif manual or not reuse_manual_refresh(cache, now=self.clock.now()):
@@ -126,8 +122,12 @@ class PluginService:
                                 if manual:
                                     cache["manual_refresh_completed_at"] = self.clock.now()
                                     self.profile.write(Record.STATE, cache)
-                        except BlockingIOError:
-                            cache = self.profile.read(Record.STATE)
+                    except BlockingIOError:
+                        cache = self.profile.read(Record.STATE)
+                    if not manual and visibility != Visibility.VISIBLE:
+                        # Only the separate resume metadata can change while
+                        # hidden. Vehicle readings and network remain untouched.
+                        cache = cache | {"polling_paused": visibility.value}
                 result.cache = cache
         except BlockingIOError:
             cache = self.profile.read(Record.STATE)

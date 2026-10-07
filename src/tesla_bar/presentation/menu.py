@@ -312,6 +312,13 @@ class MenuRenderer:
         slept, woke = resume.get("last_sleep_at"), resume.get("last_wake_at")
         if number(slept) and number(woke) and woke > slept:
             lines.append(f"--Last observed Mac sleep: {(woke - slept) / 60:.1f} min | color=gray")
+        inactive, active = resume.get("last_inactive_at"), resume.get("last_active_at")
+        if number(inactive) and number(active) and active >= inactive:
+            lines.append(f"--Last observed Mac inactivity: {(active - inactive) / 60:.1f} min | color=gray")
+        if number(resume.get("inactive_since")):
+            reason = {"locked": "locked", "display_off": "display off", "screensaver": "screen saver",
+                      "inactive": "inactive session"}.get(resume.get("inactive_reason"), "inactive")
+            lines.append(f"--Mac inactive since: {local_timestamp(resume['inactive_since'])} ({reason}) | color=gray")
         if resume.get("pending"):
             lines.append("--Mac resume refresh: pending until visible and retry is due | color=gray")
         elif number(resume.get("handled_at")):

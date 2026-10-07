@@ -1,8 +1,9 @@
-"""One wake opportunity per observed, completed Mac sleep longer than an hour."""
+"""One wake opportunity after observed Mac sleep or inactivity over an hour."""
 from dataclasses import dataclass
 from .models import number
 
 MAC_SLEEP_THRESHOLD = 60 * 60
+INACTIVE_STATES = {"locked", "display_off", "screensaver", "inactive"}
 
 
 @dataclass(frozen=True)
@@ -47,4 +48,36 @@ def observe_sleep(previous, cycle, vin, *, now):
                 and cycle.wake_at - cycle.sleep_at > MAC_SLEEP_THRESHOLD
                 and isinstance(vin, str) and vin):
             record["pending"] = {"sleep_at": cycle.sleep_at, "wake_at": cycle.wake_at, "vin": vin}
+    return record
+
+
+def observe_inactivity(previous, visibility, vin, *, now):
+    """Measure observed absence across runs; a hidden menu bar alone is not absence."""
+    record = dict(previous)
+    # Require an initialized boot baseline so a restart cannot carry an old lock.
+    if not number(record.get("armed_at")) or not number(now):
+        return record
+    start = record.get("inactive_since")
+    valid = (number(start) and record["armed_at"] <= start <= now
+             and record.get("inactive_vin") == vin)
+    if visibility in INACTIVE_STATES:
+        if not valid:
+            record.update(inactive_since=now, inactive_vin=vin,
+                          inactive_reason=visibility)
+        # Changing from locked to display-off is still the same absence.
+        return record
+    reason = record.get("inactive_reason")
+    for key in ("inactive_since", "inactive_vin", "inactive_reason"):
+        record.pop(key, None)
+    if visibility in ("visible", "bar_hidden") and valid:
+        record.update(last_inactive_at=start, last_active_at=now,
+                      last_inactive_reason=reason)
+        if now - start > MAC_SLEEP_THRESHOLD and isinstance(vin, str) and vin:
+            # Merge with any system-sleep event from the same absence, not a
+            # second queued wake. The caller consumes this one common record.
+            record["pending"] = {"sleep_at": start, "wake_at": now,
+                                 "vin": vin, "source": "inactivity"}
+    # A hidden bar alone means an active desktop: finish an existing absence,
+    # but do not claim its wake until the bar is visible. Unknown visibility
+    # breaks the measurement rather than guessing the user stayed away.
     return record
