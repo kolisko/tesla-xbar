@@ -177,11 +177,12 @@ class PollingTests(unittest.TestCase):
         self.assertNotIn("polling_paused", result.cache)
         self.assertEqual(self.gateway.commands, [])
 
-    def test_menu_refresh_action_is_distinct_from_the_scheduled_entrypoint(self):
+    def test_menu_uses_xbar_refresh_and_keeps_explicit_wake(self):
         menu = MenuRenderer(MenuContext(self.clock.now(), "/example/action")).render(self.baseline, self.config)
-        row = next(line for line in menu.splitlines() if line.startswith("Refresh now |"))
-        self.assertIn('param1="refresh"', row)
-        self.assertIn('terminal=false refresh=true', row)
+        self.assertNotIn("Refresh now", menu)
+        self.assertNotIn('param1="refresh"', menu)
+        self.assertIn("Wake vehicle and refresh", menu)
+        self.assertIn('param1="wake-refresh"', menu)
 
     def test_renewed_consent_allows_new_attempt_without_claiming_fresh_data(self):
         cache = self.baseline | {"consecutive_read_errors": 5, "read_retry_at": self.clock.now() + 3600}

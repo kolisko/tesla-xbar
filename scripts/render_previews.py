@@ -44,9 +44,9 @@ def divider(y):
 
 body += divider(440)
 for y, label, sub in [(486, 'Charging and port', True), (537, 'Locks and trunks', True), (588, 'Clima', True),
-                      (639, 'Sentry', True), (690, 'Location', True), (757, 'Refresh now', False),
-                      (804, 'Wake vehicle and refresh', False), (851, 'Connect Tesla account…', False),
-                      (898, 'Settings…', False), (945, 'Menu bar display', True)]:
+                      (639, 'Sentry', True), (690, 'Location', True), (757, 'Wake vehicle and refresh', False),
+                      (804, 'Connect Tesla account…', False), (851, 'Settings…', False),
+                      (898, 'Menu bar display', True), (945, 'Debug info', True)]:
     body += text(27, y, label, 25)
     if sub:
         body += f'<path d="m562 {y-17} 7 7-7 7" fill="none" stroke="#e5e9ed" stroke-width="2.5"/>'

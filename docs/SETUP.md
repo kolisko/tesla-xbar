@@ -97,7 +97,7 @@ When upgrading from a version without Clima controls, use the full installer
 
 Choose **Charging and port → Add key to vehicle…**, open the link on a phone with the Tesla app and approve the key for the correct vehicle. The link uses your configured domain. Then choose **Check command setup**.
 
-Test physical commands yourself when appropriate. **Start charging**, **Stop charging** and port actions can wake the vehicle. Ordinary **Refresh now** does not send wake commands. Opening a port is not a physical cable-removal mechanism.
+Test physical commands yourself when appropriate. **Start charging**, **Stop charging** and port actions can wake the vehicle. Use **Wake vehicle and refresh** when you explicitly want to wake the car and read fresh data. Opening a port is not a physical cable-removal mechanism.
 
 The **Locks and trunks** submenu groups **Lock vehicle**, **Unlock vehicle**,
 **Open front trunk** and **Open / close rear trunk**. It uses the same Vehicle
@@ -162,7 +162,7 @@ The map preview uses `location_map_enabled` (default `false`) and the `tesla-map
 
 ## Refresh only while the desktop is visible
 
-New installations refresh every five minutes. Change the interval through xBar's plugin management; the installer preserves existing intervals. The plugin’s explicit **Refresh now** bypasses visibility and local error backoff, but still honors Tesla Retry-After; it does not wake the car. Automatic requests pause while displays are asleep, your session is locked/inactive, a screen saver covers a display, or macOS reports the menu bar hidden. Saved readings and their original timestamps remain available. Updates resume at the next xBar run after the desktop is visible again (up to the configured interval), or when you choose **Refresh now**.
+New installations refresh every five minutes. Change the interval through xBar's plugin management; the installer preserves existing intervals. Use xBar’s built-in refresh/Refresh All to rerun the plugin with the same visibility, retry and Mac-resume rules as a scheduled run. The plugin has no separate **Refresh now** menu action. Automatic requests pause while displays are asleep, your session is locked/inactive, a screen saver covers a display, or macOS reports the menu bar hidden. Saved readings and their original timestamps remain available. Updates resume at the next xBar run after the desktop is visible again (up to the configured interval), or when you rerun the plugin through xBar while the desktop is visible and retry deadlines permit it.
 
 If the menu reports **desktop visibility unavailable**, update the installation so `tesla-visibility` is present. The helper needs no Screen Recording or Accessibility permission. A failed probe pauses routine requests; explicit vehicle controls still operate when you choose them. An already running request may finish when the screen turns off.
 
