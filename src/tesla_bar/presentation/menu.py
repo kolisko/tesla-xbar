@@ -268,7 +268,7 @@ class MenuRenderer:
         lines.extend(self.clima_menu(cache, vehicle_action))
         lines.extend(self.sentry_menu(cache, vehicle_action))
         lines.extend(self.location_menu(cache, config))
-        lines.extend(["---", self.action("Refresh now", "refresh"),
+        lines.extend(["---",
                       vehicle_action("Wake vehicle and refresh", "wake-refresh"),
                       self.action("Connect Tesla account…", "authorize", terminal=True),
                       self.action("Settings…", "configure", terminal=True)])

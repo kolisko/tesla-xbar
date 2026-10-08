@@ -1,6 +1,6 @@
 # API usage review
 
-Review date: 2026-10-07. This is a source-level request audit, not a historical billing report or a capture of a user's vehicle responses. Implemented savings include desktop visibility gating, the five-minute default, progressive error backoff and reuse of the plugin's explicit Refresh now result during the immediate menu redraw. The remaining proposals below are **not** implemented.
+Review date: 2026-10-08. This is a source-level request audit, not a historical billing report or a capture of a user's vehicle responses. Implemented savings include desktop visibility gating, the five-minute default and progressive error backoff. The remaining proposals below are **not** implemented.
 
 ## Requests in one invocation
 
@@ -12,8 +12,7 @@ Counts assume valid cached authorization, no concurrent action and no API error 
 | Visible desktop, vehicle asleep/offline | **1**: `GET /api/1/vehicles` | A missing map may be retrieved for the previously saved position if explicitly enabled |
 | Visible desktop, vehicle online | **2**: vehicle list, then one combined `vehicle_data` request | Address lookup or map download only when needed |
 | Local error backoff or Tesla rate-limit retry time still in the future | **0** | **0**; saved map/readings only |
-| Plugin's explicit Refresh now | Normal availability/live requests, bypassing local error backoff; Tesla's rate-limit deadline is still honored | Normal location/map work if needed |
-| Immediate xBar redraw after the plugin's Refresh now | **0** for five seconds after the action completes | **0**; reuse the manual result |
+| Built-in xBar refresh / Refresh All | Same rules and request counts as a scheduled invocation, including any pending Mac-resume wake | Same as a scheduled invocation |
 | Access token due to expire | **+1** OAuth renewal, normally reused by the rest of the invocation | None |
 | HTTP 401 without an active Retry-After | One forced OAuth renewal and one retry of that request | None |
 | Location-inclusive live read returns HTTP 403 without an active Retry-After | **3** total: list, rejected combined read, combined read without location | No new location lookup |
@@ -23,11 +22,13 @@ Counts assume valid cached authorization, no concurrent action and no API error 
 
 The last row is **five reads plus the command transport**. A legacy REST command adds one request, for six total before xBar's follow-up refresh. Signed commands may need session negotiation/retries inside Tesla's SDK, so one CLI execution is not necessarily one HTTP request. Climate power transitions can send two commands. Ordinary polling never invokes the command SDK or wake endpoint. The one-shot Mac-resume exception uses the wake endpoint after more than an hour of observed inactivity (lock, display-off, screen saver or inactive session) or recorded system sleep; it does not run on every poll.
 
-After three failed refresh attempts, the next automatic attempt waits 15 minutes, then 30 minutes after the next failure, then one hour after each further failure. Waiting invocations do not advance the failure count or deadline. This applies to access/billing failures, network errors, invalid readings and rate limits (including those without `Retry-After`); a longer server deadline wins. Normal offline/asleep/unavailable-vehicle responses reset the error state. The plugin's own **Refresh now** is a separate explicit action; built-in xBar refreshes cannot bypass the local wait. Debug info shows the earliest retry time, subject to the next visible xBar run.
+After three failed refresh attempts, the next automatic attempt waits 15 minutes, then 30 minutes after the next failure, then one hour after each further failure. Waiting invocations do not advance the failure count or deadline. This applies to access/billing failures, network errors, invalid readings and rate limits (including those without `Retry-After`); a longer server deadline wins. Normal offline/asleep/unavailable-vehicle responses reset the error state. There is no separate **Refresh now** menu action; built-in xBar refreshes cannot bypass the local wait. Debug info shows the earliest retry time, subject to the next visible xBar run.
 
 For surfaced Python Fleet API/OAuth read or wake errors, the latest actual `Retry-After` header is retained with its receipt time and parsed delay. Both seconds and HTTP dates are supported, including on non-429 errors such as 503 or 403. Debug info shows the original value, server deadline, waiting/elapsed state and which policy controls the next automatic attempt. This is one saved advice record, not a response log; expired advice remains visible with its original timestamp. An absent header is not invented, and unparseable advice is displayed without creating a server deadline. Historical responses from before this feature cannot be reconstructed. Signed-command SDK response headers are not exposed by the CLI and are not included.
 
 Sources: [`vehicle.py`](../src/tesla_bar/application/vehicle.py), [`commands.py`](../src/tesla_bar/application/commands.py), [`gateway.py`](../src/tesla_bar/infrastructure/gateway.py), [`api.py`](../src/tesla_bar/infrastructure/api.py), [`auth.py`](../src/tesla_bar/infrastructure/auth.py).
+
+The legacy CLI `refresh` entrypoint remains compatible with older callers but is not exposed in the menu. It bypasses visibility/local backoff, honors Tesla retry advice, never claims a wake, and reuses its result during an immediate menu redraw. Use the normal `menu` entrypoint to rerun the plugin with scheduled behavior.
 
 ## Volume and payload
 
