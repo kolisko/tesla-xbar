@@ -10,7 +10,7 @@ This directory contains the code installed on the user's Mac.
 | [`location.swift`](location.swift) | Source for `tesla-location`: bounded Apple reverse geocoding of coordinates received over stdin. No Tesla secrets or Mac location access. |
 | [`map_image.swift`](map_image.swift) | Source for `tesla-map-image`: local AppKit composition of a blue vehicle dot on MapMap image bytes, returning a 144 DPI PNG. No network or Mac GPS access. |
 | [`visibility.swift`](visibility.swift) | Source for `tesla-visibility`: read-only desktop/menu-bar availability probe with no network, permissions prompts or resident process. |
-| [`icons/`](icons/README.md) | Editable SVG sources and prebuilt PNG strips for charging, climate, unlock, Sentry and front/rear trunk indicators. |
+| [`icons/`](icons/README.md) | Editable SVG sources and prebuilt PNG strips for charging, climate, unlock, Sentry, front/rear trunk and Entertainment indicators. |
 | [`commands/`](commands/README.md) | Small Go adapter and tests that expose climate-keeper modes through the pinned Tesla command helper. |
 | [`__init__.py`](__init__.py) | Allows tests to import the runtime from the checkout. |
 

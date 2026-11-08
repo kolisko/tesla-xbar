@@ -69,11 +69,12 @@ If you have multiple vehicles, choose **Select vehicle** in the menu. **Menu bar
 
 Reading battery data does not require adding a virtual key to the vehicle. Many vehicles require the app's key for signed charging and charge-port commands.
 
-Camp Mode, Pet Mode, running climate, unlocked-vehicle, Sentry and front/rear trunk
+Camp Mode, Pet Mode, running climate, unlocked-vehicle, Sentry, Entertainment and front/rear trunk
 indicators use the same vehicle-data permission as battery readings. They need no
 additional consent or virtual-key pairing. After updating, they appear when the
 next successful online refresh supplies the relevant fields. The fan means
 `is_climate_on` is true; an open padlock means `locked` is explicitly false.
+A clapperboard indicates Entertainment mode on the center display. To check it on your firmware, compare a normal refresh on the navigation map, with a game or video open, and after returning to the map. No media access or extra polling is needed.
 Front/rear trunk icons use their own closure readings and may appear regardless
 of the lock state. Missing, offline/asleep or old information does not activate
 an icon. Controls are grouped under **Clima**, **Sentry** and **Locks and trunks**;
