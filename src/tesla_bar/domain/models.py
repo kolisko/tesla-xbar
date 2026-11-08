@@ -6,7 +6,7 @@ STALE_AFTER_SECONDS = 30 * 60
 READ_ERROR_THRESHOLD = 3
 
 
-STATUS_ICON_ORDER = ("charging", "camp", "pet", "fan", "unlocked", "sentry", "frunk", "trunk", "api-error")
+STATUS_ICON_ORDER = ("charging", "camp", "pet", "fan", "unlocked", "sentry", "frunk", "trunk", "entertainment", "api-error")
 
 
 COMMAND_LABELS = {'charge-start': 'Start charging',
@@ -153,4 +153,6 @@ def active_status_icons(cache, *, now):
         for field, icon in (("ft", "frunk"), ("rt", "trunk")):
             if trunk_open_state(cache["vehicle_status"], field) is True:
                 icons.append(icon)
+        if cache["vehicle_status"].get("entertainment") is True:
+            icons.append("entertainment")
     return icons

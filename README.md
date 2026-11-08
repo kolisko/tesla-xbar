@@ -26,7 +26,7 @@ Open the menu to see battery percentage, Tesla's range, charge limit, cable conn
 
 <img src="docs/images/states.png" alt="Eight display examples: charging, connected but paused, orange and red low range, and asleep or offline with a last known connected or unplugged cable" width="1000">
 
-<img src="docs/images/status-icons.png" alt="Matching monochrome charging, Camp, Pet, fan, unlock, Sentry and open front/rear trunk icons before the range" width="940">
+<img src="docs/images/status-icons.png" alt="Matching monochrome charging, Camp, Pet, fan, unlock, Sentry, open front/rear trunk and Entertainment icons before the range" width="940">
 
 Open **Clima** to see inside and outside temperatures, change climate modes, turn climate on or off, or set the target temperature for both front zones. Measured temperatures are shown separately from **Target temperature**.
 
@@ -45,6 +45,7 @@ Open **Sentry** for on/off controls and **Location** for the address, optional m
 - **Range or percentage:** switch through **Menu bar display**. Range comes directly from Tesla's range fields and uses the vehicle's distance units.
 - **Cable and charging status:** green text when connected, including scheduled or paused charging. Fresh online charging adds a monochrome lightning icon before the label, matching the other status icons.
 - **Live vehicle indicators:** a tent for Camp Mode, a paw for Pet Mode, a fan while climate is on, an open padlock when the vehicle is unlocked, a concentric-circle Sentry symbol when Sentry is on, and separate car silhouettes for an open front or rear trunk. The trunk indicators use their own closure readings independently of the lock state; both can appear together. Active indicators appear together before the range or percentage; their states also appear in the menu.
+- **Entertainment:** a clapperboard appears before the range or percentage when a fresh reading reports the center display in Entertainment mode. It uses the existing battery request. It does not identify the foreground app or depend on whether media is playing.
 - **Low-range colors:** orange below 250 km and red below 150 km when unplugged. Connected cable status takes precedence.
 - **Last known data:** asleep and offline readings keep the saved range or percentage and add a small trailing dot, such as `360 km ·` or `73% ·`. A last known connected cable stays green, and unplugged readings keep the normal range colors. The connection state and original reading timestamp stay visible in the menu.
 - **Repeated read failures:** after three consecutive failed refreshes, a monochrome circled exclamation replaces live indicators and the label becomes `— km`, `— mi` or `—%` in the native text color. The menu keeps the last known readings and their original timestamp. Successful refreshes clear the warning; confirmed offline/asleep states and unavailable-vehicle responses do not count as failures. Paused/skipped runs leave the count unchanged.

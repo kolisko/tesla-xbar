@@ -4,6 +4,8 @@ Release tags use `vMAJOR.MINOR.PATCH`; the installed xBar plugin metadata uses t
 
 ## Unreleased
 
+- Show a monochrome clapperboard when a current online reading reports Entertainment on the center display. Reuse the existing vehicle-state response without media requests or extra wakes.
+
 - Remove the separate **Refresh now** menu item. Use xBar’s built-in refresh to rerun normal plugin logic, or **Wake vehicle and refresh** to request an explicit wake. Update the menu preview and usage documentation; keep the legacy CLI entrypoint compatible.
 
 - Include observed lock, display-off, screen-saver and inactive-session periods in the one-hour Mac-resume wake rule. Track inactivity without Tesla traffic, merge it with system sleep into one wake opportunity, and expose its start/duration in Debug info.

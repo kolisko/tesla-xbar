@@ -144,10 +144,11 @@ class StatusIconTests(unittest.TestCase):
         combinations = []
         for charging, mode in itertools.product((False, True), (None, "camp", "pet")):
             for fan in (False, True):
-                for unlocked, sentry, frunk, trunk in itertools.product((False, True), repeat=4):
+                for unlocked, sentry, frunk, trunk, entertainment in itertools.product((False, True), repeat=5):
                     names = [name for name in ("charging" if charging else None, mode, "fan" if fan else None,
                              "unlocked" if unlocked else None, "sentry" if sentry else None,
-                             "frunk" if frunk else None, "trunk" if trunk else None) if name]
+                             "frunk" if frunk else None, "trunk" if trunk else None,
+                             "entertainment" if entertainment else None) if name]
                     if not names:
                         continue
                     combinations.append(names)
@@ -162,7 +163,7 @@ class StatusIconTests(unittest.TestCase):
                             chunks[png[offset + 4:offset + 8]] = png[offset + 8:offset + 8 + length]
                             offset += length + 12
                         self.assertEqual(struct.unpack(">IIB", chunks[b"pHYs"]), (5669, 5669, 1))
-        self.assertEqual(len(combinations), 191)
+        self.assertEqual(len(combinations), 383)
         self.assertEqual(app.status_icon_image(["camp", "pet"]), "")
 
     def test_trunk_icons_are_independent_of_lock_state_and_each_other(self):
@@ -218,6 +219,40 @@ class StatusIconTests(unittest.TestCase):
             menu = app.render(self.cache(), self.config)
         self.assertNotIn("templateImage=", menu)
         self.assertIn("Climate mode: Camp Mode", menu)
+
+    def test_entertainment_uses_only_the_existing_live_read_and_clears_on_next_read(self):
+        client = StatusClient({})
+        for state in ({"center_display_state": 9}, {"center_display_state": 3},
+                      {"center_display_state": 9}, {}, {"center_display_state": 8},
+                      {"center_display_state": 10}, {"center_display_state": "9"},
+                      {"center_display_state": True}, {"center_display_state": None}):
+            client.calls.clear()
+            client.sections = {"vehicle_state": {**state, "timestamp": self.now * 1000},
+                               "media_info": {"media_playback_status": "Playing"}}
+            cache = app.fetch_state(self.config, client)
+            with self.subTest(state=state):
+                self.assertEqual(client.calls, ["/api/1/vehicles",
+                    "/api/1/vehicles/EXAMPLEVIN/vehicle_data?endpoints=charge_state%3Bgui_settings%3Bclimate_state%3Bvehicle_state"])
+                active = state.get("center_display_state") == 9
+                self.assertEqual("entertainment" in app.active_status_icons(cache), active)
+                self.assertNotIn("media_info", cache)
+                for mode in ("range", "percent"):
+                    menu = app.render(cache, self.config | {"display_mode": mode})
+                    png = base64.b64decode(menu.splitlines()[0].split("templateImage=")[1])
+                    asset = "charging-entertainment.png" if active else "charging.png"
+                    self.assertEqual(png, (runtime.HERE / "icons" / asset).read_bytes())
+                    self.assertEqual("Center display: Entertainment" in menu, active)
+
+    def test_saved_entertainment_never_appears_as_a_live_icon(self):
+        cache = self.cache("off", False, True)
+        cache["vehicle_status"]["entertainment"] = True
+        for changes in ({"state": "offline"}, {"state": "asleep"}, {"polling_paused": "locked"},
+                        {"error": "Network unavailable"}, {"consecutive_read_errors": 3},
+                        {"vehicle_status": {"entertainment": True, "updated_at": self.now - app.STALE_AFTER_SECONDS}}):
+            with self.subTest(changes=changes):
+                saved = cache | changes
+                self.assertNotIn("entertainment", app.active_status_icons(saved))
+                self.assertIn("Last known center display: Entertainment", app.render(saved, self.config))
 
 
 if __name__ == "__main__":

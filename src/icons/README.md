@@ -2,7 +2,7 @@
 
 Editable SVG artwork and prebuilt Retina PNG template images for charging, Camp
 Mode, Pet Mode, running climate, an unlocked vehicle, Sentry Mode, an open front
-trunk and an open rear trunk. The 191 PNG strips cover every
+trunk, an open rear trunk and the center display in Entertainment mode. The 383 PNG strips cover every
 valid combination (Camp and Pet Mode are mutually exclusive).
 
 `api-error.svg` / `api-error.png` add a standalone circled exclamation for three
@@ -10,6 +10,8 @@ consecutive failed refreshes. It replaces all live status icons while the range
 or percentage is a neutral dash. It uses the same 16-point template tint,
 position and Retina density as the other icons. Normal offline/asleep status
 does not activate it.
+
+The clapperboard uses [Tesla's center-display field](https://developer.tesla.com/docs/fleet-api/fleet-telemetry/available-data) from the existing vehicle reading. The adapter uses the [observed REST mapping](https://github.com/timdorr/tesla-api/blob/master/docs/vehicle/state/vehiclestate.md) (9: media/entertainment), not the separate [Fleet Telemetry enum](https://github.com/teslamotors/fleet-telemetry/blob/main/protos/vehicle_data.proto). An old or unavailable reading cannot light the indicator. This is a display mode, not identification of the foreground app; no media playback information is needed.
 
 The trunk icons use the front (`ft`) and rear (`rt`) closure readings independently
 of the vehicle's lock state. Both may appear together. They require a current

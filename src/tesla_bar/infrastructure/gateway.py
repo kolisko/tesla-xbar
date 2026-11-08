@@ -41,6 +41,12 @@ class TeslaGateway:
         ):
             data = raw.get(source)
             snapshot = {k: data[k] for k in fields if k in data} if isinstance(data, dict) else {}
+            if source == "vehicle_state" and isinstance(data, dict):
+                # REST center_display_state uses 9 for entertainment/media (8 is
+                # Dog). Fleet Telemetry has a different enum; its 10 is not a REST code.
+                display = data.get("center_display_state")
+                if type(display) is int and 0 <= display <= 9:
+                    snapshot["entertainment"] = display == 9
             if snapshot:
                 snapshot["updated_at"] = timestamp(data)
             result[destination] = snapshot

@@ -48,6 +48,9 @@ class MenuRenderer:
         if isinstance(vehicle.get("locked"), bool):
             label = "Vehicle" if status_is_current(cache, "vehicle_status", now=self.context.now) else "Last known vehicle lock"
             lines.append(f"{label}: {'locked' if vehicle['locked'] else 'unlocked'}")
+        if vehicle.get("entertainment") is True:
+            label = "Center display" if status_is_current(cache, "vehicle_status", now=self.context.now) else "Last known center display"
+            lines.append(f"{label}: Entertainment")
         return lines
 
     def sentry_menu(self, cache, vehicle_action):
